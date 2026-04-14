@@ -12,15 +12,17 @@ function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      const data = await res.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
+      const dataWrapper = await res.json();
+      
+      if (dataWrapper.success) {
+        localStorage.setItem('token', dataWrapper.data.token);
         alert('Logged in successfully!');
+        window.location.href = '/';
       } else {
-        alert(data.message || 'Login failed');
+        alert(dataWrapper.message || 'Login failed');
       }
     } catch (err) {
-      alert('Error logging in');
+      alert('Error connecting to backend server');
     }
   };
 

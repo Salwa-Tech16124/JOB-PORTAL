@@ -17,8 +17,11 @@ app.use((req, res, next) => {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-key-123';
 
+const standardResponse = (res, success, data, message, statusCode = 200) => {
+    return res.status(statusCode).json({ success, data, message });
+};
+
 // ============== DATABASE MODELS ==============
-// Start isolated memory database so you don't need to install MongoDB locally
 const mongoServer = await MongoMemoryServer.create();
 const MONGO_URI = mongoServer.getUri();
 
@@ -51,14 +54,15 @@ const Profile = mongoose.model('Profile', profileSchema);
 
 // ============== MIDDLEWARE ==============
 const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'Unauthorized' });
   try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return standardResponse(res, false, null, 'Unauthorized', 401);
+    
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
+    return standardResponse(res, false, null, 'Invalid token', 401);
   }
 };
 
@@ -70,10 +74,10 @@ app.post('/api/auth/register', async (req, res) => {
     const user = new User({ email, password: hashedPassword, role });
     await user.save();
     console.log(`✅ User registered: ${email} (${role})`);
-    res.status(201).json({ message: 'User registered' });
+    return standardResponse(res, true, null, 'User registered', 201);
   } catch (error) {
     console.error(`❌ Registration error:`, error.message);
-    res.status(400).json({ error: error.message });
+    return standardResponse(res, false, null, error.message, 400);
   }
 });
 
@@ -83,45 +87,54 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user || !(await bcrypt.compare(password, user.password))) {
       console.log(`⚠️ Failed login attempt for: ${email}`);
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return standardResponse(res, false, null, 'Invalid credentials', 401);
     }
     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
     console.log(`✅ User logged in: ${email}`);
-    res.json({ token, role: user.role });
+    return standardResponse(res, true, { token, role: user.role }, 'Login successful');
   } catch (error) {
     console.error(`❌ Login error:`, error.message);
-    res.status(400).json({ error: error.message });
+    return standardResponse(res, false, null, error.message, 400);
   }
 });
 
 // ============== JOB APIs ==============
 app.get('/api/jobs', async (req, res) => {
-  const jobs = await Job.find();
-  res.json(jobs);
+  try {
+      const jobs = await Job.find();
+      return standardResponse(res, true, jobs, 'Jobs fetched');
+  } catch (e) {
+      return standardResponse(res, false, null, e.message, 500);
+  }
 });
 
 app.post('/api/jobs', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'employer') return res.status(403).json({ message: 'Forbidden' });
-
-  // 1. AI Fraud Detection
   try {
-    const aiRes = await fetch('http://127.0.0.1:8000/agent/fraud-detection', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: req.body.title || '', description: req.body.description || '' })
-    });
-    const aiData = await aiRes.json();
-    
-    if (aiData.is_fake) {
-      return res.status(400).json({ message: 'Job flagged as fraudulent', flags: aiData.flags_found });
-    }
-  } catch(e) {
-    console.error('AI Service down:', e);
-  }
+      if (req.user.role !== 'employer') return standardResponse(res, false, null, 'Forbidden', 403);
 
-  const job = new Job({ ...req.body, employerId: req.user.userId });
-  await job.save();
-  res.status(201).json(job);
+      // 1. AI Fraud Detection
+      try {
+        const aiRes = await fetch('http://127.0.0.1:8000/agent/fraud-detection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: req.body.title || '', description: req.body.description || '' })
+        });
+        const aiDataOut = await aiRes.json();
+        const aiData = aiDataOut.data; 
+        
+        if (aiData && aiData.is_fake) {
+          return standardResponse(res, false, { flags: aiData.flags_found }, 'Job flagged as fraudulent. Suspicious keywords detected.', 400);
+        }
+      } catch(e) {
+        console.error('AI Service down:', e);
+      }
+
+      const job = new Job({ ...req.body, employerId: req.user.userId });
+      await job.save();
+      return standardResponse(res, true, job, 'Job created', 201);
+  } catch (e) {
+      return standardResponse(res, false, null, e.message, 500);
+  }
 });
 
 app.get('/api/jobs/:id/match', authMiddleware, async (req, res) => {
@@ -130,7 +143,7 @@ app.get('/api/jobs/:id/match', authMiddleware, async (req, res) => {
     const profile = await Profile.findOne({ userId: req.user.userId });
     
     if (!profile || !profile.skills || profile.skills.length === 0) {
-       return res.status(400).json({ message: 'Please complete your profile first' });
+       return standardResponse(res, false, null, 'Please complete your profile first', 400);
     }
 
     const aiRes = await fetch('http://127.0.0.1:8000/agent/match', {
@@ -139,52 +152,62 @@ app.get('/api/jobs/:id/match', authMiddleware, async (req, res) => {
       body: JSON.stringify({ user_skills: profile.skills, job_description: job.description })
     });
     
-    const matchData = await aiRes.json();
-    res.json(matchData);
+    const matchDataWrapper = await aiRes.json();
+    return standardResponse(res, matchDataWrapper.success, matchDataWrapper.data, matchDataWrapper.message);
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    return standardResponse(res, false, null, e.message, 500);
   }
 });
 
 // ============== PROFILE APIs ==============
 app.get('/api/profile', authMiddleware, async (req, res) => {
-  let profile = await Profile.findOne({ userId: req.user.userId });
-  res.json(profile || {});
+  try {
+      let profile = await Profile.findOne({ userId: req.user.userId });
+      return standardResponse(res, true, profile || {}, 'Profile fetched');
+  } catch (e) {
+      return standardResponse(res, false, null, e.message, 500);
+  }
 });
 
 app.post('/api/profile', authMiddleware, async (req, res) => {
-  let { experience } = req.body; // user sends raw text about their experience
-  
-  // Ask AI to extract skills and summarize
-  let aiData = {};
-  if (experience) {
-    try {
-      const aiRes = await fetch('http://127.0.0.1:8000/agent/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: experience })
-      });
-      aiData = await aiRes.json();
-    } catch(e) {
-      console.error('AI Service down:', e);
-    }
-  }
+  try {
+      let { experience } = req.body;
+      
+      let aiData = {};
+      if (experience) {
+        try {
+          const aiRes = await fetch('http://127.0.0.1:8000/agent/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: experience })
+          });
+          const wrappedData = await aiRes.json();
+          if (wrappedData.success) {
+             aiData = wrappedData.data;
+          }
+        } catch(e) {
+          console.error('AI Service down:', e);
+        }
+      }
 
-  let profile = await Profile.findOne({ userId: req.user.userId });
-  const updateData = {
-    ...req.body,
-    skills: aiData.skills || [],
-    experience: aiData.summary || experience
-  };
+      let profile = await Profile.findOne({ userId: req.user.userId });
+      const updateData = {
+        ...req.body,
+        skills: aiData.skills || [],
+        experience: aiData.summary || experience
+      };
 
-  if (profile) {
-    Object.assign(profile, updateData);
-  } else {
-    profile = new Profile({ ...req.body, ...updateData, userId: req.user.userId });
+      if (profile) {
+        Object.assign(profile, updateData);
+      } else {
+        profile = new Profile({ ...req.body, ...updateData, userId: req.user.userId });
+      }
+      
+      await profile.save();
+      return standardResponse(res, true, profile, 'Profile updated');
+  } catch (e) {
+      return standardResponse(res, false, null, e.message, 500);
   }
-  
-  await profile.save();
-  res.json(profile);
 });
 
 // AI Proxies
@@ -193,8 +216,9 @@ app.post('/api/coach', authMiddleware, async (req, res) => {
     const aiRes = await fetch('http://127.0.0.1:8000/agent/career-coach', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
     });
-    res.json(await aiRes.json());
-  } catch(e) { res.status(500).json({ error: e.message }); }
+    const dataWrapper = await aiRes.json();
+    return standardResponse(res, dataWrapper.success, dataWrapper.data, dataWrapper.message);
+  } catch(e) { return standardResponse(res, false, null, e.message, 500); }
 });
 
 app.post('/api/interview', authMiddleware, async (req, res) => {
@@ -202,8 +226,19 @@ app.post('/api/interview', authMiddleware, async (req, res) => {
     const aiRes = await fetch('http://127.0.0.1:8000/agent/interview', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
     });
-    res.json(await aiRes.json());
-  } catch(e) { res.status(500).json({ error: e.message }); }
+    const dataWrapper = await aiRes.json();
+    return standardResponse(res, dataWrapper.success, dataWrapper.data, dataWrapper.message);
+  } catch(e) { return standardResponse(res, false, null, e.message, 500); }
+});
+
+app.post('/api/interview/evaluate', authMiddleware, async (req, res) => {
+  try {
+    const aiRes = await fetch('http://127.0.0.1:8000/agent/interview/evaluate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
+    });
+    const dataWrapper = await aiRes.json();
+    return standardResponse(res, dataWrapper.success, dataWrapper.data, dataWrapper.message);
+  } catch(e) { return standardResponse(res, false, null, e.message, 500); }
 });
 
 const PORT = process.env.PORT || 5000;

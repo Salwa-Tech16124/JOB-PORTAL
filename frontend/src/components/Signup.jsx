@@ -13,10 +13,15 @@ function Signup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, role })
       });
-      if (res.ok) alert('Registered successfully! Please login.');
-      else alert('Registration failed');
+      const dataWrapper = await res.json();
+      
+      if (dataWrapper.success) {
+          alert('Registered successfully! Please login.');
+      } else {
+          alert(dataWrapper.message || 'Registration failed');
+      }
     } catch (err) {
-      alert('Error registering');
+      alert('Error connecting to backend server');
     }
   };
 
