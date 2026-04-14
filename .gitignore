@@ -1,0 +1,21 @@
+# Node dependencies
+node_modules/
+npm-debug.log
+
+# Python dependencies
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.env
+venv/
+env/
+ENV/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vite builds
+dist/
+dist-ssr/
