@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../api';
+import { AlertTriangle, PlusCircle, Building, Briefcase, Loader2 } from 'lucide-react';
+import { Card, CardContent } from './ui/card';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
 
 function PostJob() {
   const [title, setTitle] = useState('');
@@ -11,58 +18,89 @@ function PostJob() {
   const handlePost = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const res = await fetch('http://localhost:5000/api/jobs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ title, company, description })
-      });
-
-      const dataWrapper = await res.json();
-      
-      if (dataWrapper.success) {
-        alert(dataWrapper.message || "Job Posted Successfully!");
-        navigate('/'); // Redirect to job board
+    
+    const res = await api.postJob(title, company, description);
+    
+    if (res.success) {
+      alert(res.message || "Job Posted Successfully!");
+      navigate('/');
+    } else {
+      if (res.data && res.data.flags) {
+          alert(`🚨 AI Fraud Detect:\n${res.message}\nFlags: ${res.data.flags.join(", ")}`);
       } else {
-        if (dataWrapper.data && dataWrapper.data.flags) {
-            alert(`🚨 AI Fraud Detect:\n${dataWrapper.message}\nFlags: ${dataWrapper.data.flags.join(", ")}`);
-        } else {
-            alert(dataWrapper.message || "An error occurred");
-        }
+          alert(res.message || "An error occurred");
       }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to connect to server. Did you login using an Employer account?");
     }
     setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', background: '#fff', padding: '3rem', borderRadius: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>📢 Post a New Job</h2>
-      <p style={{ color: '#666', fontStyle: 'italic', marginBottom: '20px' }}>*All posts are automatically scanned by our AI Fraud Agent.</p>
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-8 flex items-center">
+         <div className="w-12 h-12 bg-destructive/10 rounded-xl flex items-center justify-center mr-4">
+            <PlusCircle className="w-6 h-6 text-destructive" />
+         </div>
+         <div>
+            <h2 className="text-3xl font-bold text-foreground">Post a New Job</h2>
+            <p className="text-muted-foreground mt-1 flex items-center">
+              <AlertTriangle className="w-4 h-4 mr-2 text-primary/80" /> All posts are automatically scanned by our AI Fraud Agent.
+            </p>
+         </div>
+      </div>
       
-      <form onSubmit={handlePost} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#333' }}>Job Title</label>
-          <input required placeholder="e.g. Senior Backend Dev" value={title} onChange={e => setTitle(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-        </div>
-        <div>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#333' }}>Company</label>
-          <input required placeholder="e.g. Acme Corp" value={company} onChange={e => setCompany(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
-        </div>
-        <div>
-          <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#333' }}>Job Description</label>
-          <textarea required rows="6" placeholder="Describe the job, skills required, etc. (Try typing 'pay upfront' to trigger the Fraud AI!)" value={description} onChange={e => setDescription(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box', fontFamily: 'inherit' }}></textarea>
-        </div>
-        
-        <button type="submit" disabled={loading} style={{ background: '#d32f2f', color: 'white', padding: '15px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}>
-          {loading ? 'Processing...' : 'Post Job to Board'}
-        </button>
-      </form>
+      <Card className="shadow-2xl">
+        <CardContent className="p-6 md:p-10">
+          <form onSubmit={handlePost} className="space-y-6">
+            <div>
+              <Label className="flex items-center mb-2">
+                <Briefcase className="w-4 h-4 mr-2 text-primary" /> Job Title
+              </Label>
+              <Input 
+                required 
+                placeholder="e.g. Senior Backend Architect" 
+                value={title} 
+                onChange={e => setTitle(e.target.value)} 
+                className="h-12 text-[16px]"
+              />
+            </div>
+
+            <div>
+              <Label className="flex items-center mb-2">
+                <Building className="w-4 h-4 mr-2 text-primary" /> Company Name
+              </Label>
+              <Input 
+                required 
+                placeholder="e.g. Acme Corp" 
+                value={company} 
+                onChange={e => setCompany(e.target.value)} 
+                className="h-12 text-[16px]"
+              />
+            </div>
+
+            <div>
+              <Label className="flex items-center mb-2">Job Description</Label>
+              <Textarea 
+                required 
+                rows="6" 
+                placeholder="Describe the role, responsibilities, and technical requirements... (Try typing 'pay upfront' to trigger the Fraud AI!)" 
+                value={description} 
+                onChange={e => setDescription(e.target.value)} 
+                className="text-[16px] p-4 resize-y"
+              />
+            </div>
+            
+            <div className="pt-4 mt-8 border-t border-border/50">
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="w-full h-14 text-[16px] shadow-lg"
+              >
+                {loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing AI Scan...</> : 'Publish to Job Board'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

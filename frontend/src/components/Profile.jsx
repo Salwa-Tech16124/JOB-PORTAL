@@ -1,4 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../api';
+import { User, Sparkles, CheckCircle, Target, ArrowRight } from 'lucide-react';
+import { Card, CardContent } from './ui/card';
+import { Badge } from './ui/badge';
+import { Textarea } from './ui/textarea';
+import { Button } from './ui/button';
+import { Label } from './ui/label';
 
 function Profile() {
   const [experience, setExperience] = useState('');
@@ -10,101 +17,130 @@ function Profile() {
   }, []);
 
   const fetchProfile = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/api/profile', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      const dataWrapper = await res.json();
-      if (dataWrapper.success && dataWrapper.data) {
-          setProfileData(dataWrapper.data);
-          if (dataWrapper.data.experience) setExperience(dataWrapper.data.experience);
-      }
-    } catch (e) {
-      console.error(e);
+    const res = await api.getProfile();
+    if (res.success && res.data) {
+      setProfileData(res.data);
+      if (res.data.experience) setExperience(res.data.experience);
     }
   };
 
   const handleEnhance = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert("You must be logged in to use this feature!");
-        setLoading(false);
-        return;
-      }
 
-      const res = await fetch('http://localhost:5000/api/profile', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ experience, name: profileData?.name || 'User' })
-      });
-      const dataWrapper = await res.json();
-      
-      if (dataWrapper.success) {
-        setProfileData(dataWrapper.data);
-        alert(dataWrapper.message || "Profile Successfully Enhanced!");
-      } else {
-        alert(dataWrapper.message || 'An error occurred linking to the backend.');
-      }
-    } catch (e) {
-      alert("Failed to connect to backend server. Make sure Node.js is running.");
-      console.error(e);
+    const res = await api.updateProfile(experience, profileData?.name || 'User');
+    if (res.success) {
+      setProfileData(res.data);
+      // Optional: replace alert with toast in the future
+      alert(res.message || "Profile Magic Enhanced!");
+    } else {
+      alert(res.message || 'An error occurred.');
     }
     setLoading(false);
   };
 
+  const getScoreColor = (score) => {
+    if (score > 70) return 'bg-emerald-500 text-emerald-500';
+    if (score > 40) return 'bg-amber-500 text-amber-500';
+    return 'bg-destructive text-destructive';
+  };
+
   return (
-    <div style={{ maxWidth: '700px', margin: '0 auto', background: '#fff', padding: '3rem', borderRadius: '12px', boxShadow: '0 8px 16px rgba(0,0,0,0.08)' }}>
-      <h2 style={{ color: '#2c3e50', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>🤖 AI Profile Architect</h2>
-      
-      {profileData && profileData.profile_score !== undefined && (
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <strong>Profile Strength</strong>
-            <span>{profileData.profile_score}%</span>
-          </div>
-          <div style={{ width: '100%', background: '#e0e0e0', borderRadius: '10px', height: '12px', overflow: 'hidden' }}>
-            <div style={{ 
-              height: '100%', 
-              background: profileData.profile_score > 70 ? '#4caf50' : profileData.profile_score > 40 ? '#ffb300' : '#f44336', 
-              width: `${profileData.profile_score}%`,
-              transition: 'width 0.5s ease'
-            }}></div>
-          </div>
-        </div>
-      )}
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8 flex items-center">
+         <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mr-4">
+            <User className="w-6 h-6 text-primary" />
+         </div>
+         <div>
+            <h2 className="text-3xl font-bold text-foreground">AI Profile Architect</h2>
+            <p className="text-muted-foreground mt-1">Let the AI extract your hidden superpowers.</p>
+         </div>
+      </div>
 
-      {profileData && profileData.skills?.length > 0 && (
-        <div style={{ background: '#e3f2fd', borderLeft: '4px solid #1976d2', padding: '1.5rem', borderRadius: '0 8px 8px 0', marginBottom: '1.5rem' }}>
-          <strong style={{ display: 'block', marginBottom: '10px', color: '#1565c0' }}>🎯 Extracted Superpowers:</strong> 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {profileData.skills.map((skill, index) => (
-              <span key={index} style={{ background: '#1976d2', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Left Col: Analysis */}
+        <div className="md:col-span-1 flex flex-col gap-6">
+           <Card className="shadow-sm">
+             <CardContent className="p-6">
+               <h3 className="font-semibold text-foreground mb-4 flex items-center">
+                  <Target className="w-5 h-5 mr-2 text-primary" /> 
+                  Profile Strength
+               </h3>
+               {profileData?.profile_score !== undefined ? (
+                 <div>
+                   <div className="flex justify-between items-end mb-2">
+                     <span className={`text-4xl font-bold ${getScoreColor(profileData.profile_score).split(' ')[1]}`}>
+                       {profileData.profile_score}
+                       <span className="text-lg text-muted-foreground/50">/100</span>
+                     </span>
+                   </div>
+                   <div className="w-full h-3 bg-muted/30 rounded-full overflow-hidden border border-white/5">
+                     <div 
+                       className={`h-full transition-all duration-1000 ease-out shadow-lg ${getScoreColor(profileData.profile_score).split(' ')[0]}`}
+                       style={{ width: `${profileData.profile_score}%` }}
+                     ></div>
+                   </div>
+                 </div>
+               ) : (
+                  <p className="text-muted-foreground/60 text-sm italic">Analyze your profile to see score.</p>
+               )}
+             </CardContent>
+           </Card>
 
-      <form onSubmit={handleEnhance} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <label style={{ fontWeight: 'bold', color: '#555' }}>Raw Experience / Resume Text</label>
-        <textarea 
-          placeholder="Paste your raw experience, bio, or resume text here to let the AI intelligently extract your skills..." 
-          value={experience} 
-          onChange={e => setExperience(e.target.value)} 
-          rows="8"
-          style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
-        />
-        <button type="submit" disabled={loading} style={{ background: 'linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)', color: 'white', padding: '15px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(37,117,252,0.3)' }}>
-          {loading ? '🔮 AI is Magic-Enhancing...' : '✨ Magic Enhance Profile ✨'}
-        </button>
-      </form>
+           <Card className="bg-primary/5 border-primary/20 shadow-sm backdrop-blur-sm">
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center">
+                   <Sparkles className="w-5 h-5 mr-2 text-primary" />
+                   Superpowers
+                </h3>
+                {profileData?.skills?.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {profileData.skills.map((skill, index) => (
+                      <Badge 
+                        key={index}
+                        variant="secondary" 
+                        className="px-3 py-1.5 text-sm font-semibold shadow-sm"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1.5 text-primary/80" />
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                   <p className="text-primary/60 text-sm italic">Paste your resume text to extract skills.</p>
+                )}
+              </CardContent>
+           </Card>
+        </div>
+
+        {/* Right Col: Editor */}
+        <div className="md:col-span-2 flex flex-col">
+          <Card className="h-full flex flex-col shadow-xl border border-white/5">
+            <CardContent className="p-6 md:p-8 flex-1 flex flex-col">
+              <form onSubmit={handleEnhance} className="flex flex-col h-full">
+                <Label className="mb-3 block">Raw Experience / Bio</Label>
+                <Textarea 
+                  className="flex-1 w-full min-h-[300px] text-[16px] resize-none shadow-inner"
+                  placeholder="Paste your raw experience, bio, or resume text here to let the AI intelligently extract your skills..." 
+                  value={experience} 
+                  onChange={e => setExperience(e.target.value)} 
+                />
+                <Button 
+                  type="submit" 
+                  disabled={loading} 
+                  className="mt-6 w-full h-14 text-[16px] font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01]"
+                >
+                  {loading ? (
+                     <><div className="w-5 h-5 mr-3 border-2 border-primary/40 border-t-background rounded-full animate-spin"></div> AI is analyzing...</>
+                  ) : (
+                     <><Sparkles className="w-5 h-5 mr-2" /> Magic Enhance Profile <ArrowRight className="w-5 h-5 ml-2 opacity-70" /></>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

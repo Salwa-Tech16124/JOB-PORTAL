@@ -4,6 +4,8 @@ import cors from 'cors';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 app.use(cors());
@@ -22,11 +24,18 @@ const standardResponse = (res, success, data, message, statusCode = 200) => {
 };
 
 // ============== DATABASE MODELS ==============
-const mongoServer = await MongoMemoryServer.create();
+
+// Create a local data directory if it doesn't exist to persist MongoDB files
+const dbPath = path.join(process.cwd(), 'local_db');
+if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath);
+
+const mongoServer = await MongoMemoryServer.create({
+  instance: { dbPath: dbPath, storageEngine: 'wiredTiger' }
+});
 const MONGO_URI = mongoServer.getUri();
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log(`Connected to In-Memory MongoDB at ${MONGO_URI}`))
+  .then(() => console.log(`Connected to Local Persistent MongoDB at ${MONGO_URI}`))
   .catch(err => console.error('MongoDB connection error:', err));
 
 const userSchema = new mongoose.Schema({
