@@ -1,0 +1,81 @@
+backend/app/globals.css
+  ba41de09f9ba72bd 4-26,54-56,60
+frontend/src/components/ui/resizable.tsx
+  ba41de09f9ba72bd 5,12,14,27-28,35,39,52
+.vscode/settings.json
+  ba41de09f9ba72bd 2-5
+backend/package.json
+  ba41de09f9ba72bd 18,20,22-25,28-30,34,37
+frontend/tsconfig.json
+  ba41de09f9ba72bd 1-25
+backend/app/components/DashboardCard.tsx
+  ba41de09f9ba72bd 1-128
+backend/app/layout.tsx
+  ba41de09f9ba72bd 1-17
+backend/app/career-coach/page.tsx
+  ba41de09f9ba72bd 1-247
+backend/app/components/ProfileCard.tsx
+  ba41de09f9ba72bd 1-150
+frontend/package.json
+  ba41de09f9ba72bd 23-31,33-38,44-45,47,52,55,57,62-63
+backend/app/ai-profile/page.tsx
+  ba41de09f9ba72bd 1-250
+styles/global.css
+  ba41de09f9ba72bd 1-2
+start-all.bat
+  ba41de09f9ba72bd 9-12,15
+backend/next-env.d.ts
+  ba41de09f9ba72bd 1-6
+frontend/src/global.css
+  ba41de09f9ba72bd 126-144
+backend/app/settings/page.tsx
+  ba41de09f9ba72bd 1-283
+frontend/src/main.jsx
+  ba41de09f9ba72bd 4
+backend/app/interview-sim/page.tsx
+  ba41de09f9ba72bd 1-393
+backend/tsconfig.json
+  ba41de09f9ba72bd 1-37
+backend/app/components/JobCard.tsx
+  ba41de09f9ba72bd 1-85
+frontend/src/components/career-coach-section.tsx
+  ba41de09f9ba72bd 160
+backend/app/signup/page.tsx
+  ba41de09f9ba72bd 1-231
+backend/app/components/Modal.tsx
+  ba41de09f9ba72bd 1-55
+backend/app/login/page.tsx
+  ba41de09f9ba72bd 1-178
+frontend/src/components/ui/chart.tsx
+  ba41de09f9ba72bd 120-134,191,202,241,243,265-271
+backend/app/job-board/page.tsx
+  ba41de09f9ba72bd 1-238
+backend/app/dashboard/page.tsx
+  ba41de09f9ba72bd 1-217
+frontend/src/components/interview-simulator-section.tsx
+  ba41de09f9ba72bd 104,107-110,126,131
+backend/app/page.tsx
+  ba41de09f9ba72bd 1-180
+backend/app/components/Sidebar.tsx
+  ba41de09f9ba72bd 1-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "f43f5b271962426341785270f6d7b578e191bf11",
+  "prompts": {
+    "ba41de09f9ba72bd": {
+      "agent_id": {
+        "tool": "github-copilot",
+        "id": "cd94eeec-9587-420a-a4b1-ff2aa10232d6",
+        "model": "copilot/auto"
+      },
+      "human_author": "Salwa Kazmi",
+      "messages": [],
+      "total_additions": 4156,
+      "total_deletions": 433,
+      "accepted_lines": 3191,
+      "overriden_lines": 0
+    }
+  }
+}
