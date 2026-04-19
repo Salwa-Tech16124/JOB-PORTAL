@@ -1,0 +1,10 @@
+{
+  "message": "What skills should I learn for a tech career?",
+  "conversationHistory": [],
+  "userContext": {
+    "name": "John",
+    "skills": ["React", "TypeScript"],
+    "experience": "3 years",
+    "goal": "Senior Engineer"
+  }
+}

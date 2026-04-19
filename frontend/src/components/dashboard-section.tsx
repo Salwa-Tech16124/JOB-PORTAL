@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { 
   User, 
@@ -31,6 +33,20 @@ const item = {
 }
 
 export function DashboardSection() {
+  const router = useRouter()
+
+  // Check authentication on mount
+  useEffect(() => {
+    const user = localStorage.getItem("user")
+    if (!user) {
+      router.push("/login")
+    }
+  }, [router])
+
+  const handleNavigate = (path: string) => {
+    router.push(path)
+  }
+
   return (
     <motion.div
       variants={container}
@@ -46,8 +62,8 @@ export function DashboardSection() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <motion.div variants={item}>
-          <Card className="glass-card border-0 overflow-hidden group hover:shadow-xl hover:shadow-primary/10 transition-all duration-300">
+        <motion.div variants={item} className="cursor-pointer" onClick={() => handleNavigate("/ai-profile")}>
+          <Card className="glass-card border-0 overflow-hidden group hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 cursor-pointer hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Profile Score</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -69,8 +85,8 @@ export function DashboardSection() {
           </Card>
         </motion.div>
 
-        <motion.div variants={item}>
-          <Card className="glass-card border-0 overflow-hidden group hover:shadow-xl hover:shadow-accent/10 transition-all duration-300">
+        <motion.div variants={item} className="cursor-pointer" onClick={() => handleNavigate("/job-board")}>
+          <Card className="glass-card border-0 overflow-hidden group hover:shadow-xl hover:shadow-accent/10 transition-all duration-300 cursor-pointer hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Job Match Score</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -92,8 +108,8 @@ export function DashboardSection() {
           </Card>
         </motion.div>
 
-        <motion.div variants={item}>
-          <Card className="glass-card border-0 overflow-hidden group hover:shadow-xl hover:shadow-chart-3/10 transition-all duration-300">
+        <motion.div variants={item} className="cursor-pointer" onClick={() => handleNavigate("/ai-profile")}>
+          <Card className="glass-card border-0 overflow-hidden group hover:shadow-xl hover:shadow-chart-3/10 transition-all duration-300 cursor-pointer hover:scale-105">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Skills Count</CardTitle>
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-chart-3/20 to-chart-3/10 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -135,8 +151,9 @@ export function DashboardSection() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Button 
+                onClick={() => handleNavigate("/ai-profile")}
                 variant="outline" 
-                className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-primary hover:text-primary-foreground group transition-all duration-300"
+                className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-primary hover:text-primary-foreground group transition-all duration-300 cursor-pointer hover:scale-105"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <Edit3 className="w-6 h-6 text-primary group-hover:text-primary-foreground" />
@@ -149,8 +166,9 @@ export function DashboardSection() {
               </Button>
 
               <Button 
+                onClick={() => handleNavigate("/interview-sim")}
                 variant="outline" 
-                className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-accent hover:text-accent-foreground group transition-all duration-300"
+                className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-accent hover:text-accent-foreground group transition-all duration-300 cursor-pointer hover:scale-105"
               >
                 <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <Play className="w-6 h-6 text-accent group-hover:text-accent-foreground" />
@@ -163,8 +181,9 @@ export function DashboardSection() {
               </Button>
 
               <Button 
+                onClick={() => handleNavigate("/job-board")}
                 variant="outline" 
-                className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-chart-3 hover:text-white group transition-all duration-300"
+                className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-chart-3 hover:text-white group transition-all duration-300 cursor-pointer hover:scale-105"
               >
                 <div className="w-12 h-12 rounded-xl bg-chart-3/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <Eye className="w-6 h-6 text-chart-3 group-hover:text-white" />

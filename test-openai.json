@@ -1,0 +1,9 @@
+{
+  "message": "roadmap for AI engineer",
+  "userContext": {
+    "name": "Alex",
+    "skills": ["Python", "JavaScript"],
+    "experience": "1 year",
+    "goal": "AI Engineer"
+  }
+}

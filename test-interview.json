@@ -1,0 +1,9 @@
+{
+  "message": "how do I prepare for interviews as a full stack engineer",
+  "userContext": {
+    "name": "Jordan",
+    "skills": ["React", "Node.js", "MongoDB", "SQL"],
+    "experience": "2 years",
+    "goal": "Full Stack Engineer"
+  }
+}

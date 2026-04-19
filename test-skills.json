@@ -1,0 +1,9 @@
+{
+  "message": "what skills should I learn for backend developer",
+  "userContext": {
+    "name": "Sam",
+    "skills": ["HTML", "CSS", "JavaScript"],
+    "experience": "6 months",
+    "goal": "Backend Developer"
+  }
+}

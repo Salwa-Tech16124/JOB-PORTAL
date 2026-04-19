@@ -1,0 +1,9 @@
+{
+  "message": "what salary should I negotiate for as a senior backend developer",
+  "userContext": {
+    "name": "Taylor",
+    "skills": ["Java", "Spring Boot", "microservices", "Kubernetes"],
+    "experience": "5 years",
+    "goal": "Senior Backend Developer"
+  }
+}
