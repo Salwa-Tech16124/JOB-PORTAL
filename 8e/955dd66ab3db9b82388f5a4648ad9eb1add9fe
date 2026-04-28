@@ -1,0 +1,79 @@
+backend/server.js
+  b18ba7b24a949e9c 27-28,47,49-51,69-81,86-322,332-341,357,359,374,442-443,445-560,566-588,611,613-625,723-732
+  bca478972c7904d5 7-8,10-15,640,642-644,656-657,659-663,666-677,680-681,683,687-690
+frontend/src/components/interview-simulator-section.tsx
+  b18ba7b24a949e9c 43
+backend/services/promptBuilder.js
+  bca478972c7904d5 1-12,14-22,29-31,33-58,60-158,160-174,176,179-182,186,188-631,633-636,646-690,695,703-704,707,717,721-722,725,727-731,733-734
+frontend/src/components/hero-section.tsx
+  b18ba7b24a949e9c 63
+frontend/src/pages/JobBoard.jsx
+  b18ba7b24a949e9c 2,12,16,18-19,28,30-64,67-75,77-88,90-91,100-107,119,124-139,141,143-145,174-177,298-307,346,351-352,378-418,479,483-484,501,535-536
+frontend/src/pages/Signup.jsx
+  b18ba7b24a949e9c 8,68-96
+frontend/package.json
+  b18ba7b24a949e9c 22,29,42-43
+frontend/src/components/Coach.jsx
+  b18ba7b24a949e9c 329-330,524
+frontend/vite.config.js
+  b18ba7b24a949e9c 7
+backend/services/careerCoachAgent.js
+  bca478972c7904d5 1-16,18-33,35-53,71-78,80-219,222,225-227,230-232,234,238,241-244,246-255,257-264,267-270,283,290,295-297,301-313,315-322,324-332,337-340,342-344
+frontend/src/pages/Profile.jsx
+  b18ba7b24a949e9c 2,5-6,63,76-83,92-96,98-103,114-169,224-238,257-402,444-561,612-613,617,619-624,626,628-680,683-686,688-692,694-809,811,816,820,822-835
+frontend/src/components/career-coach-section.tsx
+  b18ba7b24a949e9c 99
+frontend/src/pages/Dashboard.jsx
+  b18ba7b24a949e9c 50-91,93-100,102-113,115,117-119,126-132,139-146,232-235,237-246,406-462,464-465
+frontend/src/components/JobBoard.jsx
+  b18ba7b24a949e9c 21,32,43,54,65,76,87,98,100-209
+frontend/src/api.js
+  b18ba7b24a949e9c 14-18,61,65-89
+frontend/src/pages/Login.jsx
+  b18ba7b24a949e9c 8,46-53,55-64,66-69,72,74,76-79,84,91
+frontend/src/App.jsx
+  b18ba7b24a949e9c 1,3,5-6,38-42,50-64,66,69-70,76-190,193,195,197-199,219-226,231,235,237-240,244-245,251-257,259-265,303-309,317-325,328,331-333,337-346
+frontend/src/components/job-board-section.tsx
+  b18ba7b24a949e9c 58,181
+frontend/src/pages/Coach.jsx
+  b18ba7b24a949e9c 3,8-9,11-26,29-48,62-63,66-99,113-114,119,127-136,138-143,145-151,183-184,203-221,239,245-247,350,358-364
+frontend/src/components/ui/button.tsx
+  b18ba7b24a949e9c 15,17
+frontend/index.html
+  b18ba7b24a949e9c 2
+frontend/src/index.css
+  b18ba7b24a949e9c 6-29,31-38,42-73,135,138,142-143,148,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8e955dd66ab3db9b82388f5a4648ad9eb1add9fe",
+  "prompts": {
+    "b18ba7b24a949e9c": {
+      "agent_id": {
+        "tool": "github-copilot",
+        "id": "9c6b5b0c-d3e8-4f5d-ad33-b848c69aa78e",
+        "model": "copilot/auto"
+      },
+      "human_author": "Salwa Kazmi",
+      "messages": [],
+      "total_additions": 2573,
+      "total_deletions": 1962,
+      "accepted_lines": 3909,
+      "overriden_lines": 4
+    },
+    "bca478972c7904d5": {
+      "agent_id": {
+        "tool": "github-copilot",
+        "id": "2a374e0a-a329-44b0-90b3-5fc7f08f7826",
+        "model": "copilot/auto"
+      },
+      "human_author": "Salwa Kazmi",
+      "messages": [],
+      "total_additions": 3453,
+      "total_deletions": 1907,
+      "accepted_lines": 1058,
+      "overriden_lines": 83
+    }
+  }
+}
