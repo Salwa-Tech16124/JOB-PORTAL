@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Outlet } from 'react-router-dom';
-import { Briefcase, User, Compass, Mic, PlusCircle, LogOut, Menu, LayoutGrid, Search, Moon, Sun, Bell, ChevronDown, Edit } from 'lucide-react';
+import { Briefcase, User, Compass, Mic, PlusCircle, LogOut, Menu, LayoutGrid, Search, Moon, Sun, Bell, ChevronDown, Edit, Image as ImageIcon } from 'lucide-react';
 import { ToastProvider, useToast } from './context/ToastContext';
+import { api } from './api';
+import { Avatar, AvatarFallback, AvatarImage } from './components/ui/avatar';
 import JobBoard from './pages/JobBoard';
 import Profile from './pages/Profile';
 import Coach from './pages/Coach';
@@ -33,7 +35,11 @@ function Layout() {
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem('theme', newTheme);
   };
 
@@ -41,30 +47,157 @@ function Layout() {
     setHasNotification(false);
   };
 
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return null;
+    return JSON.parse(storedUser);
+  });
+
+  const handleSearch = () => {
+    const query = searchQuery.trim();
+    if (query) {
+      navigate(`/?q=${encodeURIComponent(query)}`);
+    } else {
+      navigate('/');
+    }
+  };
+
   const handleLogout = () => {
-    // Clear all authentication data
+    // Clear auth state and remove stored user profile data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Reset notification state
+    localStorage.removeItem('profilePicture');
+    setUser(null);
     setHasNotification(true);
-    // Show logout confirmation
     toast.success('Logged out successfully', 'Goodbye!');
-    // Navigate to landing page
     setTimeout(() => navigate('/'), 300);
   };
 
-  // Get user name from localStorage
-  const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
+  const fileInputRef = useRef(null);
+
+  const compressImage = (file, maxWidth = 1024, quality = 0.75) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      const browserImage = window.Image;
+      const image = new browserImage();
+
+      reader.onload = () => {
+        const result = reader.result;
+        if (!result || typeof result !== 'string') {
+          reject(new Error('Unable to read image file.'));
+          return;
+        }
+
+        image.onload = () => {
+          const width = image.width;
+          const height = image.height;
+          const scale = Math.min(1, maxWidth / width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(width * scale);
+          canvas.height = Math.round(height * scale);
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas context unavailable.'));
+            return;
+          }
+
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const dataUrl = canvas.toDataURL(outputType, quality);
+          resolve(dataUrl);
+        };
+
+        image.onerror = () => reject(new Error('Unable to load image for compression.'));
+        image.src = result;
+      };
+
+      reader.onerror = () => reject(new Error('Error reading image file.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const estimateBase64Size = (base64) => Math.ceil(base64.length * 3 / 4);
+
+  const handleProfilePictureUpload = async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only JPG, JPEG, or PNG images are allowed.');
+      return;
+    }
+
+    const maxFileSize = 12 * 1024 * 1024; // 12MB original file limit
+    if (file.size > maxFileSize) {
+      toast.error('Please upload an image smaller than 12MB.');
+      return;
+    }
+
+    let profilePictureData;
+    try {
+      profilePictureData = await compressImage(file, 1024, 0.75);
+    } catch (error) {
+      console.error('Image compression failed:', error);
+      toast.error('Unable to compress the selected image. Please try a smaller file.');
+      return;
+    }
+
+    const approximateSize = estimateBase64Size(profilePictureData.split(',')[1] || profilePictureData);
+    if (approximateSize > 50 * 1024 * 1024) {
+      toast.error('Compressed image is too large. Please choose a smaller image.');
+      return;
+    }
+
+    if (user) {
+      const updatedUser = { ...user, profilePicture: profilePictureData };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+
+      try {
+        const response = await api.updateProfile({ profilePicture: profilePictureData });
+        if (!response.success) {
+          toast.error('Could not save profile picture to server.');
+        }
+      } catch (error) {
+        console.error('Profile picture save error:', error);
+        toast.error('Could not save profile picture to server.');
+      }
+    }
+
+    toast.success('Profile picture updated successfully.');
+    window.dispatchEvent(new Event('userUpdated'));
+  };
+
+  useEffect(() => {
+    const syncUser = () => {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) {
+        setUser(null);
+        return;
+      }
+      setUser(JSON.parse(storedUser));
+    };
+
+    window.addEventListener('loginSuccess', syncUser);
+    window.addEventListener('userUpdated', syncUser);
+
+    return () => {
+      window.removeEventListener('loginSuccess', syncUser);
+      window.removeEventListener('userUpdated', syncUser);
+    };
+  }, []);
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden pointer-events-auto">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden pointer-events-auto gap-4">
       {/* Sidebar */}
-      <aside className="w-64 glass-card border-r border-[#ffffff20] hidden md:flex flex-col shadow-sm fixed inset-y-0 left-0 z-40">
+      <aside className="w-64 glass-card border-r border-[#ffffff20] hidden md:flex flex-shrink-0 flex-col shadow-sm z-40">
         <div className="h-16 flex items-center px-6 border-b border-[#ffffff10]">
-          <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center mr-3 shadow-md shadow-primary/30 animate-pulse-glow">
-            <span className="text-white font-bold text-lg">AI</span>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="JobPortal Logo" className="h-8 w-auto object-contain" />
+            <span className="font-semibold text-lg text-foreground">JobPortal</span>
           </div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">JobPortal</h1>
         </div>
         
         <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
@@ -83,35 +216,53 @@ function Layout() {
           <Link to="/interview" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
             <Mic className="w-5 h-5 mr-3" /> Interview Prep
           </Link>
-          <div className="pt-4 mt-4 border-t border-[#ffffff10]">
-            <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employers</p>
-            <Link to="/post-job" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-secondary/10 hover:text-secondary rounded-xl transition-colors font-medium">
-              <PlusCircle className="w-5 h-5 mr-3" /> Post Job
-            </Link>
-          </div>
+          {user?.role === 'employer' && (
+            <div className="pt-4 mt-4 border-t border-[#ffffff10]">
+              <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employers</p>
+              <Link to="/post-job" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-secondary/10 hover:text-secondary rounded-xl transition-colors font-medium">
+                <PlusCircle className="w-5 h-5 mr-3" /> Post Job
+              </Link>
+            </div>
+          )}
         </nav>
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 md:ml-[256px] flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Top Navbar */}
         <header className="h-16 glass border-b border-border flex items-center justify-between px-6 z-30 sticky top-0 shadow-sm">
           {/* Left: Mobile Menu */}
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center gap-2 md:hidden">
             <Menu className="w-6 h-6 text-foreground" />
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="JobPortal Logo" className="h-8 w-auto object-contain" />
+              <span className="font-semibold text-lg text-foreground">JobPortal</span>
+            </div>
           </div>
 
           {/* Center: Search Bar */}
-          <div className="hidden md:flex flex-1 mx-8 max-w-md">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground/60" />
+          <div className="hidden md:flex flex-1 mx-8 max-w-2xl">
+            <div className="flex items-center gap-3 w-full">
               <input
                 type="text"
                 placeholder="Search jobs, skills, companies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-input bg-background/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                className="flex-1 pr-4 pl-4 py-2 rounded-lg border border-input bg-background/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
               />
+              <button
+                type="button"
+                onClick={handleSearch}
+                className="px-6 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Search
+              </button>
             </div>
           </div>
 
@@ -149,13 +300,13 @@ function Layout() {
                   onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                   className="flex items-center gap-2 pl-3 pr-2 py-2 hover:bg-primary/10 rounded-lg transition-colors border-l border-border group"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-sm font-bold shadow-md">
-                    {user.name
-                      ?.split(' ')
-                      .map((n) => n[0])
-                      .join('')
-                      .toUpperCase() || 'U'}
-                  </div>
+                  <Avatar className="w-8 h-8">
+                    {user.profilePicture ? (
+                      <AvatarImage src={user.profilePicture} alt={`${user.name || 'User'} profile`} />
+                    ) : (
+                      <AvatarFallback>{user.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                    )}
+                  </Avatar>
                   <div className="hidden sm:flex flex-col text-left">
                     <span className="text-sm font-semibold text-foreground">{user.name}</span>
                     <span className="text-xs text-muted-foreground capitalize">{user.role || 'User'}</span>
@@ -163,15 +314,36 @@ function Layout() {
                   <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </button>
 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/jpeg,image/jpg,image/png"
+                  capture="user"
+                  className="hidden"
+                  onChange={handleProfilePictureUpload}
+                />
+
                 {/* Dropdown Menu */}
                 {profileMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.click();
+                        }
+                        setProfileMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-3 text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2 font-medium"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Set Profile Picture
+                    </button>
                     <button
                       onClick={() => {
                         navigate('/profile');
                         setProfileMenuOpen(false);
                       }}
-                      className="w-full text-left px-4 py-3 text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2 font-medium"
+                      className="w-full text-left px-4 py-3 text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2 font-medium border-t border-border"
                     >
                       <User className="w-4 h-4" />
                       View Profile

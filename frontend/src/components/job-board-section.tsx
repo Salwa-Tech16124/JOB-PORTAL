@@ -55,7 +55,7 @@ const featuredJobs = [
     match: 92,
     skills: ["React", "Python", "GraphQL"],
     logo: "M",
-    color: "from-blue-600 to-purple-600",
+    color: "from-orange-500 to-blue-500",
     posted: "3 days ago"
   },
   {
@@ -178,7 +178,7 @@ export function JobBoardSection() {
           <CardContent>
             <div 
               ref={carouselRef}
-              className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2"
+              className="flex gap-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4"
               style={{ scrollSnapType: "x mandatory" }}
             >
               {featuredJobs.map((job) => (

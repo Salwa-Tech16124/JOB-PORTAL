@@ -1,39 +1,50 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Lightbulb, MessageSquare, Trash2, Loader2, Copy, Check } from 'lucide-react';
+import { Send, Lightbulb, MessageSquare, Trash2, Loader2, Copy, Check, AlertCircle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
+import { Link } from 'react-router-dom';
+import { api } from '../api';
 
-// AI Response Templates
-const AI_RESPONSES = {
-  career: [
-    "To advance your career, focus on these key areas: 1) Continuous skill development in emerging technologies, 2) Building a strong professional network, 3) Taking on leadership opportunities, 4) Documenting your achievements and impact.",
-    "Career growth is a marathon, not a sprint. Set clear, measurable goals for the next 12 months. Break them into quarterly milestones and track your progress regularly.",
-    "Consider a skills audit - list your current strengths and identify gaps in the market. Then create a targeted learning plan to address those gaps within 3-6 months."
-  ],
-  salary: [
-    "When negotiating salary, research market rates using Glassdoor, Levels.fyi, and similar tools. Base your ask on: experience level, location, company size, and your unique value proposition.",
-    "Document your achievements with metrics: increased revenue by X%, improved performance by Y%, reduced costs by Z%. These quantified results are powerful in salary negotiations.",
-    "Consider the total compensation package: base salary, bonuses, stock options, benefits, remote flexibility, PTO, and professional development budget. Sometimes a lower base with better benefits is actually better."
-  ],
-  skills: [
-    "Focus on these in-demand skills: 1) System Design, 2) Cloud Technologies (AWS/Azure/GCP), 3) DevOps/CI-CD, 4) Full-stack development, 5) Data science/ML fundamentals.",
-    "Create a learning roadmap: pick 2-3 skills to master over the next 6 months. Use resources like LeetCode, Udemy, Coursera, or YouTube. Build projects to apply your learning.",
-    "The best way to learn is by building. Pick a real-world project, encounter challenges, and solve them. This practical experience is worth more than passive learning."
-  ],
-  interview: [
-    "Prepare using the STAR method: Situation, Task, Action, Result. Practice 10-15 behavioral questions and have concrete examples ready for common scenarios like conflict resolution, failures, and achievements.",
-    "Technical interviews: Practice on LeetCode (aim for 50+ problems). Focus on understanding algorithms, not memorizing solutions. Explain your thought process clearly during interviews.",
-    "Always ask thoughtful questions at the end: 'What does success look like in this role?', 'What are the biggest challenges?', 'How is the team structured?'. This shows genuine interest."
-  ],
-  general: [
-    "Building a successful tech career requires: continuous learning, strong communication skills, networking, taking calculated risks, and being adaptable to industry changes.",
-    "Don't underestimate soft skills - they're often what separates great engineers from exceptional leaders. Focus on communication, collaboration, and problem-solving.",
-    "Your first 5 years in tech are crucial. Choose companies and roles that will teach you the most. Don't just chase salary - invest in learning and growth."
-  ]
+const renderMessageContent = (content) => {
+  if (typeof content !== 'string') return String(content);
+  return content.split('\n').map((line, i) => {
+    const parts = line.split(/(\*\*.*?\*\*)/g);
+    return (
+      <span key={i}>
+        {parts.map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>;
+          }
+          return part;
+        })}
+        {i < content.split('\n').length - 1 && <br />}
+      </span>
+    );
+  });
 };
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div className="p-8 text-red-500 bg-red-100 rounded">
+        <h1>Something went wrong.</h1>
+        <pre className="mt-4">{this.state.error?.toString()}</pre>
+        <pre className="mt-2 text-xs">{this.state.error?.stack}</pre>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
 
 function CareerCoach() {
   const toast = useToast();
@@ -48,29 +59,48 @@ function CareerCoach() {
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [profileComplete, setProfileComplete] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        const userObj = userStr ? JSON.parse(userStr) : {};
+        const profileRes = await api.getProfile();
+        
+        if (profileRes.success && profileRes.data) {
+          const profile = profileRes.data;
+          const data = {
+            name: userObj.name || profile.name || 'Guest User',
+            skills: profile.skills || [],
+            experience: profile.experience || '',
+            goal: profile.careerGoal || profile.targetRole || '',
+            currentRole: profile.currentRole || ''
+          };
+          setProfileData(data);
+
+          // Check if profile is complete enough for personalized advice
+          if (data.skills.length > 0 && data.experience) {
+            setProfileComplete(true);
+          } else {
+            setProfileComplete(false);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Categorize questions
-  const getCategory = (question) => {
-    const q = question.toLowerCase();
-    if (q.includes('salary') || q.includes('pay') || q.includes('negotiate')) return 'salary';
-    if (q.includes('skill') || q.includes('learn') || q.includes('improve')) return 'skills';
-    if (q.includes('interview') || q.includes('prepare') || q.includes('leet')) return 'interview';
-    if (q.includes('career') || q.includes('job') || q.includes('advance')) return 'career';
-    return 'general';
-  };
-
-  // Get AI response
-  const getAIResponse = (question) => {
-    const category = getCategory(question);
-    const responses = AI_RESPONSES[category];
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -80,11 +110,13 @@ function CareerCoach() {
       return;
     }
 
+    const currentInput = inputValue;
+
     // Add user message
     const userMessage = {
       id: messages.length + 1,
       type: 'user',
-      content: inputValue,
+      content: currentInput,
       timestamp: new Date()
     };
 
@@ -92,21 +124,31 @@ function CareerCoach() {
     setInputValue('');
     setLoading(true);
 
-    // Simulate API call with delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const res = await api.sendMessageCoach(currentInput, profileData || {});
+      
+      let aiResponseText = '';
+      if (res.success && res.data && res.data.message) {
+        aiResponseText = res.data.message;
+      } else {
+        // Fallback structurally if API call fails entirely
+        aiResponseText = "I encountered an error analyzing your request. Here's a brief fallback: Please clearly state your target role, so I can generate a roadmap.";
+      }
 
-    // Get AI response
-    const aiResponse = getAIResponse(inputValue);
-    const aiMessage = {
-      id: messages.length + 2,
-      type: 'ai',
-      content: aiResponse,
-      timestamp: new Date()
-    };
+      const aiMessage = {
+        id: messages.length + 2,
+        type: 'ai',
+        content: aiResponseText,
+        timestamp: new Date()
+      };
 
-    setMessages(prev => [...prev, aiMessage]);
-    setLoading(false);
-    toast.success('AI response generated!', 'Got It');
+      setMessages(prev => [...prev, aiMessage]);
+      toast.success('AI response generated!', 'Got It');
+    } catch (err) {
+      toast.error('Failed to communicate with AI Coach', 'Error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopyMessage = (id, content) => {
@@ -138,8 +180,8 @@ function CareerCoach() {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center">
-              <Lightbulb className="w-6 h-6 text-purple-500" />
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
+              <Lightbulb className="w-6 h-6 text-orange-500" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">Career Coach</h1>
@@ -158,6 +200,25 @@ function CareerCoach() {
         </div>
       </motion.div>
 
+      {/* Profile Warning Banner */}
+      {!profileComplete && profileData && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl p-3 mb-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <p><strong>{profileData.name || 'Guest User'}</strong> | Incomplete Profile: Our AI provides much better guidance with a completed tech profile.</p>
+          </div>
+          <Link to="/profile">
+            <Button size="sm" variant="outline" className="h-8 border-amber-500/50 hover:bg-amber-500/10">
+              Update Profile
+            </Button>
+          </Link>
+        </motion.div>
+      )}
+
       {/* Messages Container */}
       <motion.div 
         initial={{ opacity: 0 }}
@@ -175,13 +236,15 @@ function CareerCoach() {
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                   message.type === 'user'
                     ? 'bg-primary text-primary-foreground rounded-tr-none'
                     : 'bg-background/50 border border-border rounded-tl-none'
                 }`}
               >
-                <p className="text-sm leading-relaxed">{message.content}</p>
+                <div className="text-sm leading-relaxed overflow-x-auto whitespace-pre-wrap">
+                  {renderMessageContent(message.content)}
+                </div>
                 
                 {message.type === 'ai' && (
                   <button
@@ -284,7 +347,7 @@ function CareerCoach() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="mt-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-3 text-center text-xs text-muted-foreground"
+        className="mt-4 bg-gradient-to-r from-orange-500/10 to-blue-500/10 border border-orange-500/20 rounded-xl p-3 text-center text-xs text-muted-foreground"
       >
         💡 {messages.length - 1} messages in this conversation • AI Coach is available 24/7
       </motion.div>
@@ -292,4 +355,10 @@ function CareerCoach() {
   );
 }
 
-export default CareerCoach;
+export default function CareerCoachWrapper(props) {
+  return (
+    <ErrorBoundary>
+      <CareerCoach {...props} />
+    </ErrorBoundary>
+  );
+}

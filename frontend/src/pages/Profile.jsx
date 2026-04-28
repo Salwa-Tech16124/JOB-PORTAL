@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Save, ArrowLeft, AlertCircle, CheckCircle, Sparkles, Target, Edit3, UserCog } from 'lucide-react';
+import { User, Save, ArrowLeft, AlertCircle, AlertTriangle, BarChart3, Brain, CheckCircle, Sparkles, Target, Edit3, UserCog, UploadCloud, FileText, Lightbulb, Wand2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../api';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -58,6 +60,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const toast = useToast();
   const formRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [user, setUser] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -70,6 +73,14 @@ export default function Profile() {
   const [skillInput, setSkillInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [profileCompletion, setProfileCompletion] = useState(0);
+  const [resumeAnalysis, setResumeAnalysis] = useState(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState(null);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [autoFixLoading, setAutoFixLoading] = useState(false);
+  const [uploadedResume, setUploadedResume] = useState(null);
+  const [uploadedResumeName, setUploadedResumeName] = useState('');
+  const [improvementResult, setImprovementResult] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -78,11 +89,18 @@ export default function Profile() {
       return;
     }
 
-    // Load user data from localStorage
-    const userData = localStorage.getItem('user');
-    if (userData) {
+    const syncStoredUser = () => {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+      let parsedUser = {};
+
       try {
-        const parsedUser = JSON.parse(userData);
+        parsedUser = JSON.parse(userData) || {};
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+
+      if (Object.keys(parsedUser).length > 0) {
         setUser(parsedUser);
         setFormData({
           name: parsedUser.name || '',
@@ -92,10 +110,63 @@ export default function Profile() {
           bio: parsedUser.bio || '',
           education: parsedUser.education || ''
         });
-      } catch (e) {
-        console.error('Error parsing user data:', e);
       }
-    }
+    };
+
+    const loadProfile = async () => {
+      syncStoredUser();
+
+      try {
+        const profileResponse = await api.getProfile();
+        if (profileResponse.success && profileResponse.data) {
+          const storedUser = localStorage.getItem('user');
+          let parsedUser = {};
+
+          if (storedUser) {
+            try {
+              parsedUser = JSON.parse(storedUser) || {};
+            } catch (e) {
+              console.error('Error parsing stored user:', e);
+            }
+          }
+
+          const profileData = profileResponse.data || {};
+          const mergedUser = {
+            ...parsedUser,
+            ...profileData,
+            name: profileData.name?.trim() ? profileData.name : (parsedUser.name || ''),
+            profilePicture: profileData.profilePicture || parsedUser.profilePicture || '',
+            skills: Array.isArray(profileData.skills) ? profileData.skills : (parsedUser.skills || [])
+          };
+          localStorage.setItem('user', JSON.stringify(mergedUser));
+          setUser(mergedUser);
+          setFormData({
+            name: mergedUser.name || '',
+            role: mergedUser.role || '',
+            skills: Array.isArray(mergedUser.skills) ? mergedUser.skills : [],
+            experience: mergedUser.experience || '',
+            bio: mergedUser.bio || '',
+            education: mergedUser.education || ''
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load persisted profile:', error);
+      }
+    };
+
+    loadProfile();
+
+    const handleStoredUserUpdate = () => {
+      syncStoredUser();
+    };
+
+    window.addEventListener('loginSuccess', handleStoredUserUpdate);
+    window.addEventListener('userUpdated', handleStoredUserUpdate);
+
+    return () => {
+      window.removeEventListener('loginSuccess', handleStoredUserUpdate);
+      window.removeEventListener('userUpdated', handleStoredUserUpdate);
+    };
   }, [navigate]);
 
   // Calculate profile completion
@@ -150,14 +221,21 @@ export default function Profile() {
         return;
       }
 
-      const updatedUser = {
-        ...user,
-        ...formData
-      };
+      const profileResponse = await api.updateProfile(formData);
+      if (profileResponse.success && profileResponse.data) {
+        const updatedUser = {
+          ...user,
+          ...profileResponse.data,
+          ...formData
+        };
 
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      toast.success('Profile saved successfully!', 'Success');
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        window.dispatchEvent(new Event('userUpdated'));
+        toast.success('Profile saved successfully!', 'Success');
+      } else {
+        toast.error(profileResponse.message || 'Failed to save profile', 'Error');
+      }
     } catch (err) {
       console.error('Error saving profile:', err);
       toast.error('Failed to save profile', 'Error');
@@ -175,6 +253,152 @@ export default function Profile() {
     if (score > 40) return 'text-amber-500';
     return 'text-destructive';
   };
+
+  const getResumeScoreColor = (score) => {
+    if (score > 70) return 'bg-emerald-500';
+    if (score > 40) return 'bg-amber-500';
+    return 'bg-destructive';
+  };
+
+  const getResumeScoreLabel = (score) => {
+    if (score > 70) return 'Strong';
+    if (score > 40) return 'متوسط';
+    return 'Weak';
+  };
+
+  const computeResumeScore = (analysis) => {
+    if (!analysis) return 0;
+    let score = 85;
+    score -= (analysis.missingSections?.length || 0) * 14;
+    score -= (analysis.skillGaps?.length || 0) * 8;
+    if (analysis.summaryStrength === 'Weak summary') score -= 12;
+    if (analysis.summaryStrength === 'Missing summary') score -= 20;
+    return Math.min(100, Math.max(0, score));
+  };
+
+  const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const base64 = dataUrl?.toString().split(',')[1] || '';
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const triggerResumeUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleResumeFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const supportedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!supportedTypes.includes(file.type)) {
+      toast.error('Resume upload accepts only PDF or DOCX files.', 'Unsupported file');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const fileData = await readFileAsBase64(file);
+      setUploadedResume({ fileName: file.name, fileType: file.type, fileData });
+      setUploadedResumeName(file.name);
+      setResumeAnalysis(null);
+      setSuggestions(null);
+      setImprovementResult(null);
+      toast.success('Resume ready to analyze.', 'Success');
+    } catch (err) {
+      console.error('Resume read failed:', err);
+      toast.error('Could not read resume file. Please try again.', 'Error');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleAnalyzeResume = async () => {
+    if (!uploadedResume) return;
+
+    setResumeLoading(true);
+    setResumeAnalysis(null);
+    setSuggestions(null);
+    setImprovementResult(null);
+
+    try {
+      const response = await api.analyzeResume(uploadedResume);
+      if (response.success && response.data) {
+        setResumeAnalysis(response.data);
+        toast.success('Resume analyzed successfully!', 'Success');
+      } else {
+        toast.error(response.message || 'Failed to analyze resume', 'Error');
+      }
+    } catch (err) {
+      console.error('Resume analysis failed:', err);
+      toast.error('Resume analysis failed. Please try again.', 'Error');
+    } finally {
+      setResumeLoading(false);
+    }
+  };
+
+  const handleGetSuggestions = async () => {
+    setSuggestionLoading(true);
+    setSuggestions(null);
+
+    try {
+      const response = await api.getProfileSuggestions({ profile: formData, resumeAnalysis });
+      if (response.success && response.data) {
+        setSuggestions(response.data);
+      } else {
+        toast.error(response.message || 'Failed to generate suggestions', 'Error');
+      }
+    } catch (err) {
+      console.error('Suggestion generation failed:', err);
+      toast.error('Failed to generate suggestions', 'Error');
+    } finally {
+      setSuggestionLoading(false);
+    }
+  };
+
+  const handleAutoFix = async () => {
+    if (!resumeAnalysis) return;
+    setAutoFixLoading(true);
+
+    try {
+      const response = await api.improveResume({ profile: formData, resumeAnalysis });
+      if (response.success && response.data) {
+        const improvement = response.data;
+        const oldSummary = resumeAnalysis.extractedSummary || formData.bio || '';
+        setFormData((prev) => ({
+          ...prev,
+          bio: improvement.improvedSummary || prev.bio,
+          experience: improvement.improvedExperience || prev.experience,
+          education: improvement.improvedEducation || prev.education,
+          skills: Array.from(new Set([...(prev.skills || []), ...(improvement.addedSkills || [])]))
+        }));
+        setImprovementResult({
+          oldSummary,
+          newSummary: improvement.improvedSummary || oldSummary
+        });
+        setSuggestions((prev) => prev ? { ...prev, betterSummary: improvement.improvedSummary || prev.betterSummary } : prev);
+        toast.success('Resume improvements applied to your profile.', 'Success');
+      } else {
+        toast.error(response.message || 'Failed to improve resume', 'Error');
+      }
+    } catch (err) {
+      console.error('Resume auto-fix failed:', err);
+      toast.error('Auto-fix failed. Please try again.', 'Error');
+    } finally {
+      setAutoFixLoading(false);
+    }
+  };
+
+  const resumeScore = computeResumeScore(resumeAnalysis);
+  const resumeLabel = getResumeScoreLabel(resumeScore);
+  const canAnalyzeResume = Boolean(uploadedResume);
+  const canGetSuggestions = Boolean(resumeAnalysis);
+  const canImproveResume = Boolean(resumeAnalysis);
 
   // Show empty state if no data
   if (profileCompletion === 0) {
@@ -215,6 +439,124 @@ export default function Profile() {
             <Edit3 className="w-4 h-4 mr-2" />
             Complete Your Profile
           </Button>
+        </div>
+
+        <div className="mt-10 rounded-3xl border border-white/10 bg-card/75 p-6 shadow-sm">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx"
+            onChange={handleResumeFileChange}
+            className="hidden"
+          />
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-foreground">Resume Architect</h3>
+                <p className="text-sm text-muted-foreground">Upload your resume and get instant structure feedback before you finish your profile.</p>
+              </div>
+              <UploadCloud className="w-6 h-6 text-primary" />
+            </div>
+            <Button type="button" onClick={triggerResumeUpload} className="w-full justify-center gap-2" size="lg">
+              <FileText className="w-4 h-4" />
+              Upload Resume
+            </Button>
+            {uploadedResumeName && (
+              <p className="text-sm text-muted-foreground">Uploaded file: {uploadedResumeName}</p>
+            )}
+            {resumeLoading && (
+              <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4 text-sm text-foreground">
+                Analyzing resume, please wait...
+              </div>
+            )}
+            {resumeAnalysis && (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-secondary/5 p-4">
+                    <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Summary</p>
+                    <p className="mt-2 text-sm text-foreground">{resumeAnalysis.extractedSummary || 'No summary section found in uploaded resume.'}</p>
+                  </div>
+                  <div className="rounded-2xl bg-secondary/5 p-4">
+                    <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Strength</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{resumeAnalysis.summaryStrength}</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-secondary/5 p-4">
+                    <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Skills</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(resumeAnalysis.extractedSkills.length ? resumeAnalysis.extractedSkills : ['No skills extracted yet']).map((skill) => (
+                        <Badge key={skill} variant="secondary">{skill}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-secondary/5 p-4">
+                    <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Missing Sections</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(resumeAnalysis.missingSections.length ? resumeAnalysis.missingSections : ['None']).map((section) => (
+                        <Badge key={section} variant="outline">{section}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {resumeAnalysis.skillGaps?.length > 0 && (
+                  <div className="rounded-2xl bg-secondary/5 p-4">
+                    <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Skill gaps</p>
+                    <ul className="mt-3 list-disc list-inside text-sm text-foreground space-y-1">
+                      {resumeAnalysis.skillGaps.map((gap) => (
+                        <li key={gap}>{gap}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    type="button"
+                    onClick={handleGetSuggestions}
+                    disabled={suggestionLoading}
+                    className="flex-1 gap-2"
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    {suggestionLoading ? 'Generating...' : 'Get AI Suggestions'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleAutoFix}
+                    disabled={autoFixLoading}
+                    variant="outline"
+                    className="flex-1 gap-2"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    {autoFixLoading ? 'Improving...' : 'Improve Resume'}
+                  </Button>
+                </div>
+                {suggestions && (
+                  <div className="rounded-2xl bg-background/50 border border-white/10 p-4 space-y-4">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">What to improve</p>
+                      <ul className="mt-3 list-disc list-inside text-sm text-foreground space-y-1">
+                        {suggestions.whatToImprove.map((note, index) => (
+                          <li key={index}>{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">What to add</p>
+                      <ul className="mt-3 list-disc list-inside text-sm text-foreground space-y-1">
+                        {suggestions.whatToAdd.map((note, index) => (
+                          <li key={index}>{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-2xl bg-secondary/10 p-4">
+                      <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Better Summary</p>
+                      <p className="mt-2 text-sm text-foreground">{suggestions.betterSummary}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Edit Form Section - Full Width Below */}
@@ -267,179 +609,233 @@ export default function Profile() {
         </Button>
       </motion.div>
 
-      {/* Analytics Section - Keep Original Design */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-        {/* Left Col: Analysis */}
-        <motion.div 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="md:col-span-1 flex flex-col gap-6"
+          className="space-y-6"
         >
-          {/* Profile Strength Card */}
-          <Card className="shadow-sm">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-foreground mb-4 flex items-center">
-                <Target className="w-5 h-5 mr-2 text-primary" /> 
-                Profile Strength
-              </h3>
-              <div>
-                <div className="flex justify-between items-end mb-2">
-                  <span className={`text-4xl font-bold ${getScoreColor(profileCompletion)}`}>
-                    {profileCompletion}
-                    <span className="text-lg text-muted-foreground/50">/100</span>
-                  </span>
+          <Card className="shadow-sm border border-white/10">
+            <CardHeader className="p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg">Resume Architect</CardTitle>
+                  <p className="text-sm text-muted-foreground">Upload, analyze, review, and improve your resume in one clean flow.</p>
                 </div>
-                <div className="w-full h-3 bg-muted/30 rounded-full overflow-hidden border border-white/5">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${profileCompletion}%` }}
-                    transition={{ duration: 0.8 }}
-                    className={`h-full transition-all duration-1000 ease-out shadow-lg ${profileCompletion > 70 ? 'bg-emerald-500' : profileCompletion > 40 ? 'bg-amber-500' : 'bg-destructive'}`}
-                  />
-                </div>
+                <UploadCloud className="w-6 h-6 text-primary" />
               </div>
-            </CardContent>
-          </Card>
+            </CardHeader>
+            <CardContent className="p-6 space-y-5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx"
+                onChange={handleResumeFileChange}
+                className="hidden"
+              />
 
-          {/* Skills Card */}
-          <Card className="bg-primary/5 border-primary/20 shadow-sm backdrop-blur-sm">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-foreground mb-4 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-primary" />
-                Skills ({formData.skills.length})
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {formData.skills.length > 0 ? (
-                  formData.skills.map((skill, index) => (
-                    <motion.div
-                      key={skill}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <Badge 
-                        variant="secondary" 
-                        className="px-3 py-1.5 text-sm font-semibold shadow-sm"
-                      >
-                        <CheckCircle className="w-3 h-3 mr-1.5 text-primary/80" />
-                        {skill}
-                      </Badge>
-                    </motion.div>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground">No skills added yet</p>
-                )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  onClick={triggerResumeUpload}
+                  className="w-full justify-center gap-2"
+                  size="lg"
+                >
+                  <FileText className="w-4 h-4" />
+                  Upload Resume
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleAnalyzeResume}
+                  variant="outline"
+                  disabled={!canAnalyzeResume || resumeLoading}
+                  className="w-full justify-center gap-2"
+                  size="lg"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Analyze Resume
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleGetSuggestions}
+                  variant="outline"
+                  disabled={!canGetSuggestions || suggestionLoading}
+                  className="w-full justify-center gap-2"
+                  size="lg"
+                >
+                  <Lightbulb className="w-4 h-4" />
+                  Get Suggestions
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleAutoFix}
+                  variant="outline"
+                  disabled={!canImproveResume || autoFixLoading}
+                  className="w-full justify-center gap-2"
+                  size="lg"
+                >
+                  <Wand2 className="w-4 h-4" />
+                  Improve Resume
+                </Button>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Profile Info Card */}
-          <Card className="bg-secondary/5 border-secondary/20 shadow-sm">
-            <CardContent className="p-6">
-              <h3 className="font-semibold text-foreground mb-4 flex items-center">
-                <User className="w-5 h-5 mr-2 text-secondary" />
-                Profile Info
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Name</p>
-                  <p className="text-foreground font-medium">{formData.name || 'Not added'}</p>
+              {uploadedResumeName && (
+                <div className="rounded-2xl border border-muted/20 bg-muted/5 p-4 text-sm text-foreground">
+                  <p className="font-medium">Ready to analyze</p>
+                  <p className="text-muted-foreground mt-1">{uploadedResumeName}</p>
                 </div>
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Email</p>
-                  <p className="text-foreground font-medium">{user?.email}</p>
+              )}
+
+              {resumeLoading && (
+                <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4 text-sm text-foreground">
+                  Analyzing resume, please wait...
                 </div>
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Role</p>
-                  <p className="text-foreground font-medium">{user?.role || 'Not defined'}</p>
+              )}
+
+              {resumeAnalysis && (
+                <div className="space-y-4">
+                  <Card className="rounded-3xl border border-white/10 bg-background/60">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Resume Score</p>
+                          <div className="mt-2 flex items-center gap-3">
+                            <span className="text-3xl font-semibold text-foreground">{resumeScore}</span>
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${resumeScore > 70 ? 'bg-emerald-500/10 text-emerald-500' : resumeScore > 40 ? 'bg-amber-500/10 text-amber-500' : 'bg-destructive/10 text-destructive'}`}>
+                              {resumeLabel}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground">
+                          <div>0</div>
+                          <div className="mt-2">100</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 h-3 w-full rounded-full bg-muted/20 overflow-hidden">
+                        <div
+                          className={`${getResumeScoreColor(resumeScore)} h-full rounded-full transition-all duration-300`}
+                          style={{ width: `${resumeScore}%` }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card className="rounded-3xl border border-white/10">
+                      <CardHeader className="p-5 flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        <CardTitle className="text-sm font-semibold">Extracted Skills</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5">
+                        <div className="flex flex-wrap gap-2">
+                          {resumeAnalysis.extractedSkills.length > 0 ? (
+                            resumeAnalysis.extractedSkills.map(skill => (
+                              <Badge key={skill} variant="secondary">{skill}</Badge>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No skills were detected in the uploaded resume.</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-3xl border border-white/10">
+                      <CardHeader className="p-5 flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        <CardTitle className="text-sm font-semibold">Missing Sections</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5">
+                        <div className="flex flex-wrap gap-2">
+                          {resumeAnalysis.missingSections.length > 0 ? (
+                            resumeAnalysis.missingSections.map(section => (
+                              <Badge key={section} variant="outline">{section}</Badge>
+                            ))
+                          ) : (
+                            <Badge variant="secondary">None</Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-3xl border border-white/10">
+                      <CardHeader className="p-5 flex items-center gap-3">
+                        <BarChart3 className="w-5 h-5 text-primary" />
+                        <CardTitle className="text-sm font-semibold">Skill Gaps</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5">
+                        {resumeAnalysis.skillGaps.length > 0 ? (
+                          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+                            {resumeAnalysis.skillGaps.map((gap) => (
+                              <li key={gap}>{gap}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Resume matches the core skills for your role.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-3xl border border-white/10">
+                      <CardHeader className="p-5 flex items-center gap-3">
+                        <Brain className="w-5 h-5 text-violet-500" />
+                        <CardTitle className="text-sm font-semibold">Summary Feedback</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5">
+                        <p className="text-sm font-medium text-foreground">{resumeAnalysis.summaryStrength}</p>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {resumeAnalysis.extractedSummary || 'A stronger summary will help your resume stand out in the first section.'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {improvementResult && (
+                    <Card className="rounded-3xl border border-white/10">
+                      <CardHeader className="p-5">
+                        <CardTitle className="text-lg">Before / After</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5 grid gap-4 lg:grid-cols-2">
+                        <div className="rounded-2xl bg-secondary/5 p-4">
+                          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Old Summary</p>
+                          <p className="mt-3 text-sm text-foreground whitespace-pre-line">{improvementResult.oldSummary || 'No existing summary available.'}</p>
+                        </div>
+                        <div className="rounded-2xl bg-primary/5 p-4">
+                          <p className="text-sm uppercase tracking-[0.2em] text-primary">Improved Summary</p>
+                          <p className="mt-3 text-sm text-foreground whitespace-pre-line">{improvementResult.newSummary}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Right Col: Status */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="md:col-span-2 flex flex-col gap-6"
+          className="space-y-6"
         >
-          {/* Completion Status */}
-          <Card className="h-full shadow-lg border border-white/5">
-            <CardContent className="p-6 md:p-8">
-              <h3 className="text-2xl font-bold text-foreground mb-6">Profile Status</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/20">
-                  <div className="flex items-center gap-3">
-                    {formData.name.trim() ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <AlertCircle className="w-5 h-5 text-destructive" />}
-                    <span className="font-medium">Full Name</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{formData.name ? '✓' : '×'}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/20">
-                  <div className="flex items-center gap-3">
-                    {formData.skills.length > 0 ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <AlertCircle className="w-5 h-5 text-destructive" />}
-                    <span className="font-medium">Skills Added</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{formData.skills.length > 0 ? `${formData.skills.length}` : '×'}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/20">
-                  <div className="flex items-center gap-3">
-                    {formData.experience.trim() ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <AlertCircle className="w-5 h-5 text-destructive" />}
-                    <span className="font-medium">Experience</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{formData.experience ? '✓' : '×'}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/20">
-                  <div className="flex items-center gap-3">
-                    {formData.bio.trim() ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <AlertCircle className="w-5 h-5 text-destructive" />}
-                    <span className="font-medium">Bio/Summary</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{formData.bio ? '✓' : '×'}</span>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/20">
-                  <div className="flex items-center gap-3">
-                    {formData.education.trim() ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <AlertCircle className="w-5 h-5 text-destructive" />}
-                    <span className="font-medium">Education</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{formData.education ? '✓' : '×'}</span>
-                </div>
-              </div>
-
-              <Button
-                onClick={scrollToEdit}
-                className="w-full mt-6 bg-gradient-to-r from-primary to-primary/80"
-              >
-                <Edit3 className="w-4 h-4 mr-2" />
-                Edit & Complete Profile
-              </Button>
-            </CardContent>
-          </Card>
+          <div ref={formRef}>
+            <EditProfileForm
+              formData={formData}
+              skillInput={skillInput}
+              loading={loading}
+              profileCompletion={profileCompletion}
+              onInputChange={handleInputChange}
+              onSkillInputChange={setSkillInput}
+              onAddSkill={handleAddSkill}
+              onRemoveSkill={handleRemoveSkill}
+              onSave={handleSave}
+              onCancel={() => navigate('/dashboard')}
+            />
+          </div>
         </motion.div>
       </div>
 
-      {/* Edit Form Section - Scroll Target */}
-      <div ref={formRef}>
-        <EditProfileForm
-          formData={formData}
-          skillInput={skillInput}
-          loading={loading}
-          profileCompletion={profileCompletion}
-          onInputChange={handleInputChange}
-          onSkillInputChange={setSkillInput}
-          onAddSkill={handleAddSkill}
-          onRemoveSkill={handleRemoveSkill}
-          onSave={handleSave}
-          onCancel={() => navigate('/dashboard')}
-        />
-      </div>
     </div>
   );
 }

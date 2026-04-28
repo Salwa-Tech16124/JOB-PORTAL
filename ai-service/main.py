@@ -35,6 +35,7 @@ class CareerInput(BaseModel):
 class AnswerInput(BaseModel):
     question: str
     answer: str
+    expected_topics: List[str] = []
 
 # A categorized and extensible dictionary for intelligent, normalized skill extraction
 TECH_DICTIONARY = {
@@ -78,15 +79,26 @@ TECH_DICTIONARY = {
 }
 
 def extract_normalized_skills(text: str) -> list:
-    """Intelligently extracts and normalizes skills using strict word boundaries."""
+    """Intelligently extracts and normalizes skills using lookarounds for reliable bounded matching."""
     found_skills = set()
     text_lower = text.lower()
+    
+    # Preprocessing: normalize common disjointed phrases before extraction
+    replacements = {
+        "java script": "javascript",
+        "react js": "react",
+        "react.js": "react",
+        "node js": "nodejs",
+        "node.js": "nodejs"
+    }
+    for old, new in replacements.items():
+        text_lower = text_lower.replace(old, new)
     
     for category, category_skills in TECH_DICTIONARY.items():
         for canonical, aliases in category_skills.items():
             for alias in aliases:
-                # Use regex boundaries to safely match "js" without triggering on "json"
-                if re.search(r'\b' + re.escape(alias) + r'\b', text_lower):
+                # Use regex lookarounds to safely match "js" (not "json") and "c++" (handling non-word chars)
+                if re.search(r'(?<!\w)' + re.escape(alias) + r'(?!\w)', text_lower):
                     display_name = canonical.upper() if len(canonical) <= 3 else canonical.title()
                     found_skills.add(display_name)
                     break # Stop checking aliases once the primary canonical skill is found
@@ -120,11 +132,16 @@ async def job_match_agent(data: MatchInput):
         desc_lower = data.job_description.lower()
         user_skills_lower = [s.lower() for s in data.user_skills]
         
-        # Simple heuristic split: Look for keywords that imply optional skills
-        optional_keywords = ["optional", "bonus", "nice to have", "plus", "preferred"]
+        # Structured heuristic split: Look for specific section boundaries instead of single words
+        optional_section_markers = [
+            "nice to have", "nice-to-have", "bonus skills", 
+            "optional skills", "preferred qualifications", 
+            "preferred skills", "optional requirements", "bonus points for"
+        ]
+        
         split_index = len(desc_lower)
-        for kw in optional_keywords:
-            idx = desc_lower.find(kw)
+        for marker in optional_section_markers:
+            idx = desc_lower.find(marker)
             if idx != -1 and idx < split_index:
                 split_index = idx
                 
@@ -139,8 +156,8 @@ async def job_match_agent(data: MatchInput):
                 
         if not core_skills and not optional_skills:
             return standard_response({
-                "match_percentage": 100, "missing_skills": [], "matched_skills": []
-            }, message="No specific technical requirements found in job description")
+                "match_percentage": None, "missing_skills": [], "matched_skills": []
+            }, message="No technical skills detected in job description")
 
         matched_skills = []
         missing_skills = []
@@ -195,15 +212,73 @@ QUESTION_BANK = {
             {"question": "How do you design a system to handle 1 million concurrent web sockets?", "expected_topics": ["System Design", "Load Balancing", "Redis", "Scaling"]},
             {"question": "Explain Microservices vs Monolithic architecture.", "expected_topics": ["Microservices", "Monolith", "Coupling", "Deployment"]}
         ]
+    },
+    "fullstack": {
+        "junior": [
+            {"question": "How do you handle CORS issues between a frontend and backend?", "expected_topics": ["CORS", "Headers", "Security", "Middleware"]},
+            {"question": "Describe the lifecycle of an HTTP request from browser to database.", "expected_topics": ["DNS", "HTTP", "Server", "Database", "Response"]}
+        ],
+        "senior": [
+            {"question": "How do you implement authentication across a decoupled full-stack application?", "expected_topics": ["JWT", "OAuth", "Cookies", "Stateless"]},
+            {"question": "Explain your approach to designing a scalable API that serves a high-traffic web client.", "expected_topics": ["Caching", "Pagination", "Rate Limiting", "GraphQL"]}
+        ]
+    },
+    "mobile": {
+        "junior": [
+            {"question": "What is the difference between native and cross-platform mobile development?", "expected_topics": ["iOS", "Android", "React Native", "Flutter", "Performance"]},
+            {"question": "How do you securely store user credentials on a mobile device?", "expected_topics": ["Keychain", "Keystore", "Encryption", "Security"]}
+        ],
+        "senior": [
+            {"question": "How do you manage complex background tasks and push notifications?", "expected_topics": ["Background Workers", "APNs", "FCM", "Battery Optimization"]},
+            {"question": "Explain how you would profile and resolve a memory leak in a mobile app.", "expected_topics": ["Memory Management", "Instruments", "Garbage Collection", "Profiling"]}
+        ]
+    },
+    "data": {
+        "junior": [
+            {"question": "What is the difference between supervised and unsupervised learning?", "expected_topics": ["Machine Learning", "Labels", "Clustering", "Classification"]},
+            {"question": "How do you handle missing or corrupted data in a dataset?", "expected_topics": ["Imputation", "Dropping", "Pandas", "Cleaning"]}
+        ],
+        "senior": [
+            {"question": "Explain how you would deploy a machine learning model to production.", "expected_topics": ["Docker", "API", "Inference", "Monitoring", "CI/CD"]},
+            {"question": "How do you prevent overfitting in deep learning models?", "expected_topics": ["Regularization", "Dropout", "Cross-validation", "Data"]}
+        ]
+    },
+    "devops": {
+        "junior": [
+            {"question": "What is the purpose of Docker and containerization?", "expected_topics": ["Docker", "Containers", "Isolation", "Environments"]},
+            {"question": "Explain the concept of Continuous Integration and Continuous Deployment (CI/CD).", "expected_topics": ["CI/CD", "Pipelines", "Automation", "Git"]}
+        ],
+        "senior": [
+            {"question": "How do you design a fault-tolerant and highly available infrastructure?", "expected_topics": ["Load Balancing", "Auto-scaling", "Multi-AZ", "Redundancy"]},
+            {"question": "Explain your approach to monitoring and alerting for a distributed system.", "expected_topics": ["Prometheus", "Grafana", "Logs", "Metrics", "SLIs"]}
+        ]
     }
 }
 
 @app.post("/agent/interview")
 async def interview_agent(data: InterviewInput):
     try:
-        role_cat = "frontend" if "frontend" in data.role.lower() else "backend"
+        role_lower = data.role.lower()
+        
+        # Intelligent role mapping based on common keywords
+        role_mapping = {
+            "frontend": ["frontend", "ui", "ux", "react", "vue", "angular", "web"],
+            "backend": ["backend", "api", "node", "python", "java", "c#", "go", "ruby"],
+            "fullstack": ["fullstack", "full stack"],
+            "mobile": ["mobile", "android", "ios", "react native", "flutter", "swift", "kotlin"],
+            "data": ["data", "machine learning", "ai", "scientist", "analyst", "sql", "pandas"],
+            "devops": ["devops", "cloud", "aws", "gcp", "azure", "docker", "kubernetes", "sre"]
+        }
+        
+        role_cat = "general"
+        for cat, keywords in role_mapping.items():
+            if any(kw in role_lower for kw in keywords):
+                role_cat = cat
+                break
+                
         level_cat = "senior" if "senior" in data.experience_level.lower() or "lead" in data.experience_level.lower() else "junior"
         
+        # If role_cat isn't in QUESTION_BANK (e.g., "mobile", "general"), tech_questions will default to []
         tech_questions = QUESTION_BANK.get(role_cat, {}).get(level_cat, [])
         general_questions = [
             {"question": f"Can you walk me through your experience as a {data.role}?", "expected_topics": ["Career History", "Projects", "Impact"]},
@@ -221,20 +296,31 @@ async def interview_agent(data: InterviewInput):
 async def evaluate_answer(data: AnswerInput):
     try:
         word_count = len(data.answer.split())
-        extracted_tech = extract_normalized_skills(data.answer)
+        answer_lower = data.answer.lower()
         
-        if word_count > 15 and len(extracted_tech) > 0:
+        # 1. Compare user answer against expected_topics
+        if data.expected_topics:
+            matched_topics = [t for t in data.expected_topics if t.lower() in answer_lower]
+            relevance = len(matched_topics) / len(data.expected_topics)
+            display_topics = matched_topics
+        else: # Legacy extraction fallback
+            display_topics = extract_normalized_skills(data.answer)
+            relevance = 1.0 if len(display_topics) >= 2 else (0.5 if len(display_topics) == 1 else 0.0)
+
+        # 2. Rule-based relevance scoring thresholds
+        if relevance >= 0.5 and word_count >= 15:
             score = "Pass (Strong)"
-            feedback = f"Great answer! You provided good depth and properly referenced technical concepts like: {', '.join(extracted_tech)}."
-        elif word_count > 5:
-            score = "Pass (Marginal)"
-            feedback = "Acceptable, but try to expand your answer using more specific technical details."
+            topic_str = f" like: {', '.join(display_topics)}" if display_topics else ""
+            feedback = f"Great answer! You provided good depth and properly referenced key concepts{topic_str}."
+        elif relevance > 0.1 or word_count > 15:
+            score = "Pass"
+            feedback = "Acceptable, but try to expand your answer focusing on the core expected technical mechanisms."
         else:
             score = "Fail"
-            feedback = "Answer is too short or lacks technical substance."
+            feedback = "Answer is too short or lacks relevant substance for this question."
             
         return standard_response({
-            "score": score, "feedback": feedback, "word_count": word_count, "extracted_tech": extracted_tech
+            "score": score, "feedback": feedback, "word_count": word_count, "matched_topics": display_topics, "relevance": relevance
         }, message="Response evaluated successfully")
     except Exception as e:
         return standard_response(success=False, message=str(e))
@@ -243,16 +329,37 @@ async def evaluate_answer(data: AnswerInput):
 @app.post("/agent/fraud-detection")
 async def fraud_detection_agent(data: JobPostInput):
     try:
-        red_flags = ["pay upfront", "wire transfer", "no interview required", "easy money", "crypto"]
         content = (data.title + " " + data.description).lower()
         
-        found_flags = [flag for flag in red_flags if flag in content]
-        is_fake = len(found_flags) > 0
+        # High confidence phrases using regex patterns (Pattern, Display Label)
+        critical_flags = [
+            (r"pay upfront", "pay upfront"), (r"wire transfer", "wire transfer"), 
+            (r"wire money", "wire money"), (r"no interview required", "no interview required"), 
+            (r"easy money", "easy money"), (r"send crypto", "send crypto"), 
+            (r"send bitcoin", "send bitcoin"), (r"pay out of pocket", "pay out of pocket"), 
+            (r"western union", "western union")
+        ]
+        
+        # Moderate warning flags using regex patterns to handle slight variations
+        warning_flags = [
+            (r"start(s)? immediately", "start immediately"),
+            (r"unlimited earning(s)?", "unlimited earnings"),
+            (r"(?:pay )?cash daily", "cash daily"),
+            (r"direct message me|dm me", "direct message me")
+        ]
+        
+        critical_found = [label for pat, label in critical_flags if re.search(pat, content)]
+        warning_found = [label for pat, label in warning_flags if re.search(pat, content)]
+        
+        # Logic: 1 critical flag OR multiple warning flags indicates a scam
+        is_fake = len(critical_found) > 0 or len(warning_found) >= 2
+        
+        all_flags = critical_found + warning_found
         
         return standard_response({
             "is_fake": is_fake,
-            "reasoning": "Suspicious keywords detected." if is_fake else "Looks legitimate.",
-            "flags_found": found_flags
+            "reasoning": f"Suspicious phrases detected: {', '.join(all_flags)}." if is_fake else "Looks legitimate.",
+            "flags_found": all_flags
         }, message="Fraud scan complete")
     except Exception as e:
         return standard_response(success=False, message=str(e))

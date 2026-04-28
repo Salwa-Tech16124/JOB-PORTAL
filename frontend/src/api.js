@@ -11,7 +11,11 @@ const getHeaders = () => {
 const handleResponse = async (res) => {
     try {
         const data = await res.json();
-        return data; 
+        if (res.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+        }
+        return data;
     } catch (err) {
         return { success: false, data: null, message: 'Server did not return JSON' };
     }
@@ -54,11 +58,35 @@ export const api = {
         const res = await fetch(`${BASE_URL}/profile`, { headers: getHeaders() });
         return handleResponse(res);
     },
-    updateProfile: async (experience, name) => {
+    updateProfile: async (profileData) => {
         const res = await fetch(`${BASE_URL}/profile`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ experience, name })
+            body: JSON.stringify(profileData)
+        });
+        return handleResponse(res);
+    },
+    analyzeResume: async (resumePayload) => {
+        const res = await fetch(`${BASE_URL}/profile/resume-analyze`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(resumePayload)
+        });
+        return handleResponse(res);
+    },
+    getProfileSuggestions: async (profilePayload) => {
+        const res = await fetch(`${BASE_URL}/profile/suggestions`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(profilePayload)
+        });
+        return handleResponse(res);
+    },
+    improveResume: async (profilePayload) => {
+        const res = await fetch(`${BASE_URL}/profile/improve`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(profilePayload)
         });
         return handleResponse(res);
     },
@@ -83,6 +111,33 @@ export const api = {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ question, answer })
+        });
+        return handleResponse(res);
+    },
+    sendMessageCoach: async (message, userContext) => {
+        const res = await fetch(`${BASE_URL}/coach/message`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ message, userContext })
+        });
+        return handleResponse(res);
+    },
+    applyJob: async (jobId) => {
+        const res = await fetch(`${BASE_URL}/jobs/${jobId}/apply`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse(res);
+    },
+    getApplications: async () => {
+        const res = await fetch(`${BASE_URL}/applications`, { headers: getHeaders() });
+        return handleResponse(res);
+    },
+    updateApplicationStatus: async (appId, status) => {
+        const res = await fetch(`${BASE_URL}/applications/${appId}/status`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({ status })
         });
         return handleResponse(res);
     }

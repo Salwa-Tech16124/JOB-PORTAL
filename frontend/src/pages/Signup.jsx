@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { motion } from 'framer-motion';
+import { api } from '../api';
 
 function SignupModal({ isOpen, onClose, onSignupSuccess }) {
   const toast = useToast();
@@ -64,37 +65,35 @@ function SignupModal({ isOpen, onClose, onSignupSuccess }) {
 
     try {
       if (validateEmail(email) && validatePassword(password) && validatePasswordMatch(password, confirmPassword)) {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Extract name from email (first part before @)
-        const nameFromEmail = email.split('@')[0].replace(/[._-]/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        
-        // Store user data in localStorage
-        const userData = {
-          email,
-          name: nameFromEmail,
-          role: role === 'employer' ? 'Employer' : 'Job Seeker',
-          signupTime: new Date().toISOString()
-        };
-        
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', 'dummy-token-' + Date.now());
-        
-        toast.success(`Welcome ${nameFromEmail}! Account created successfully!`, 'Success!');
-        
-        // Reset form
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        setRole('candidate');
-        setTouched({ email: false, password: false, confirmPassword: false });
-        
-        // Close modal and trigger success callback
-        setTimeout(() => {
-          onClose();
-          onSignupSuccess?.();
-        }, 500);
+        const response = await api.signup(email, password, role);
+        if (response.success && response.data?.token) {
+          const nameFromEmail = email.split('@')[0].replace(/[._-]/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          const userData = {
+            ...response.data.user,
+            name: response.data.user.name || nameFromEmail,
+            signupTime: new Date().toISOString()
+          };
+
+          localStorage.setItem('user', JSON.stringify(userData));
+          localStorage.setItem('token', response.data.token);
+
+          toast.success(`Welcome ${nameFromEmail}! Account created successfully!`, 'Success!');
+
+          // Reset form
+          setEmail('');
+          setPassword('');
+          setConfirmPassword('');
+          setRole('candidate');
+          setTouched({ email: false, password: false, confirmPassword: false });
+
+          // Close modal and trigger success callback
+          setTimeout(() => {
+            onClose();
+            onSignupSuccess?.();
+          }, 500);
+        } else {
+          toast.error(response.message || 'Please check all fields', 'Validation Error');
+        }
       } else {
         toast.error('Please check all fields', 'Validation Error');
       }

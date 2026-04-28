@@ -40,7 +40,7 @@ const item = {
 
 const interviewTypes = [
   { id: "behavioral", name: "Behavioral", icon: MessageSquare, color: "from-blue-500 to-cyan-500" },
-  { id: "technical", name: "Technical", icon: Zap, color: "from-purple-500 to-pink-500" },
+  { id: "technical", name: "Technical", icon: Zap, color: "from-orange-500 to-blue-500" },
   { id: "system-design", name: "System Design", icon: Bot, color: "from-emerald-500 to-teal-500" },
 ]
 

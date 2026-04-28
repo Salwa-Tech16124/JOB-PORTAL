@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../api';
 import { motion } from 'framer-motion';
 import {
   User,
@@ -36,6 +37,8 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [missingFields, setMissingFields] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [isEmployer, setIsEmployer] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -44,49 +47,87 @@ export default function Dashboard() {
       return;
     }
 
-    // Load user from localStorage
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
+    const computeProfileState = (userObj) => {
+      const requiredFields = {
+        name: userObj.name || '',
+        skills: Array.isArray(userObj.skills) ? userObj.skills.length > 0 : false,
+        experience: userObj.experience || '',
+        bio: userObj.bio || '',
+        education: userObj.education || ''
+      };
 
-        // Calculate profile completion based on actual filled fields
-        const requiredFields = {
-          name: parsedUser.name || '',
-          skills: Array.isArray(parsedUser.skills) ? parsedUser.skills.length > 0 : false,
-          experience: parsedUser.experience || '',
-          bio: parsedUser.bio || '',
-          education: parsedUser.education || ''
-        };
+      const filledFields = Object.entries(requiredFields)
+        .filter(([key, value]) => {
+          if (key === 'skills') return value === true;
+          return value && String(value).trim().length > 0;
+        })
+        .length;
 
-        const filledFields = Object.entries(requiredFields)
-          .filter(([key, value]) => {
-            if (key === 'skills') return value === true;
-            return value && String(value).trim().length > 0;
-          })
-          .length;
+      const totalFields = Object.keys(requiredFields).length;
+      const completion = Math.round((filledFields / totalFields) * 100);
+      setProfileCompletion(completion);
 
-        const totalFields = Object.keys(requiredFields).length;
-        const completion = Math.round((filledFields / totalFields) * 100);
-        setProfileCompletion(completion);
+      const missing = [];
+      if (!requiredFields.name) missing.push('name');
+      if (!requiredFields.skills) missing.push('skills');
+      if (!requiredFields.experience) missing.push('experience');
+      if (!requiredFields.bio) missing.push('bio');
+      if (!requiredFields.education) missing.push('education');
+      setMissingFields(missing);
+    };
 
-        // Calculate missing fields
-        const missing = [];
-        if (!requiredFields.name) missing.push('name');
-        if (!requiredFields.skills) missing.push('skills');
-        if (!requiredFields.experience) missing.push('experience');
-        if (!requiredFields.bio) missing.push('bio');
-        if (!requiredFields.education) missing.push('education');
-        setMissingFields(missing);
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+    const loadDashboardData = async () => {
+      const userData = localStorage.getItem('user');
+      let parsedUser = {};
+
+      if (userData) {
+        try {
+          parsedUser = JSON.parse(userData);
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
       }
-    }
+
+      if (parsedUser) {
+        setUser(parsedUser);
+        setIsEmployer(parsedUser.role === 'employer');
+        computeProfileState(parsedUser);
+      }
+
+      const applicationsRes = await api.getApplications();
+      if (applicationsRes.success) {
+        setApplications(applicationsRes.data);
+      }
+
+      try {
+        const profileRes = await api.getProfile();
+        if (profileRes.success && profileRes.data) {
+          const mergedUser = {
+            ...parsedUser,
+            ...profileRes.data
+          };
+          setUser(mergedUser);
+          setIsEmployer(mergedUser.role === 'employer');
+          localStorage.setItem('user', JSON.stringify(mergedUser));
+          computeProfileState(mergedUser);
+        }
+      } catch (e) {
+        console.error('Failed to refresh profile data:', e);
+      }
+    };
+
+    loadDashboardData();
   }, [navigate]);
 
   const handleNavigate = (path) => {
     navigate(path);
+  };
+
+  const handleUpdateStatus = async (appId, status) => {
+    const res = await api.updateApplicationStatus(appId, status);
+    if (res.success) {
+      setApplications(prev => prev.map(a => a.id === appId ? { ...a, status } : a));
+    }
   };
 
   // Extract user name (or show "Guest User" if not filled)
@@ -95,12 +136,14 @@ export default function Dashboard() {
   // Empty state if profile is incomplete
   if (profileCompletion === 0) {
     return (
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="space-y-6 p-6"
-      >
+      <div className="flex-1 bg-gray-50">
+        <div className="max-w-[1200px] mx-auto px-6 md:px-10 lg:px-16 py-6">
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="space-y-10"
+          >
         {/* Welcome */}
         <motion.div variants={item}>
           <h1 className="text-3xl font-bold text-foreground">Welcome!</h1>
@@ -186,17 +229,21 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       </motion.div>
-    );
-  }
+    </div>
+  </div>
+  );
+}
 
-  // If profile has some data, show dashboard with real metrics
-  return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="space-y-6 p-6"
-    >
+// If profile has some data, show dashboard with real metrics
+return (
+    <div className="flex-1 bg-gray-50">
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 lg:px-16 py-6">
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="space-y-10"
+        >
       {/* Welcome - conditional based on name */}
       <motion.div variants={item}>
         <h1 className="text-3xl font-bold text-foreground">
@@ -356,6 +403,65 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Applications Tracking Section */}
+      <motion.div variants={item} className="mt-8">
+        <h2 className="text-2xl font-bold text-foreground mb-4">
+          {isEmployer ? 'Active Applications' : 'Your Applications Tracker'}
+        </h2>
+        {applications.length === 0 ? (
+          <Card className="glass-card border-0 py-8 text-center text-muted-foreground">
+            {isEmployer ? 'No one has applied to your jobs yet.' : 'You have not applied to any jobs yet.'}
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {applications.map((app) => (
+              <Card key={app.id} className="glass-card border border-border/50 hover:border-primary/30 transition-colors p-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  {/* Info side based on Role */}
+                  {isEmployer ? (
+                    <div>
+                      <h3 className="font-bold text-lg text-foreground">{app.candidate?.name}</h3>
+                      <p className="text-muted-foreground text-sm flex items-center gap-2">
+                        <span>Applied for: <strong>{app.job?.title}</strong></span>
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">Skills: {app.candidate?.skills?.join(', ') || 'None'}</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="font-bold text-lg text-foreground">{app.job?.title || 'Unknown Job'}</h3>
+                      <p className="text-muted-foreground text-sm flex items-center gap-2">
+                        <Briefcase className="w-4 h-4" /> {app.job?.company || 'Unknown Company'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Status & Actions side */}
+                  <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      app.status === 'Applied' ? 'bg-primary/20 text-primary' :
+                      app.status === 'Viewed by Company' ? 'bg-chart-3/20 text-chart-3' :
+                      app.status === 'Accepted' ? 'bg-emerald-500/20 text-emerald-500' :
+                      'bg-destructive/20 text-destructive'
+                    }`}>
+                      {app.status}
+                    </span>
+                    
+                    {isEmployer && app.status !== 'Viewed by Company' && (
+                      <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(app.id, 'Viewed by Company')}>
+                        <Eye className="w-4 h-4 mr-1" /> View Profile
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
     </motion.div>
+      </div>
+    </div>
   );
 }

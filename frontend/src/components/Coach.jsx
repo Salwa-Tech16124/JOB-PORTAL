@@ -326,8 +326,8 @@ function CareerCoach() {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center">
-              <Lightbulb className="w-6 h-6 text-purple-500" />
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
+              <Lightbulb className="w-6 h-6 text-orange-500" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">Career Coach</h1>
@@ -521,7 +521,7 @@ function CareerCoach() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="mt-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-3 text-center text-xs text-muted-foreground"
+              className="mt-4 bg-gradient-to-r from-orange-500/10 to-blue-500/10 border border-orange-500/20 rounded-xl p-3 text-center text-xs text-muted-foreground"
             >
               💡 {messages.length - 1} messages in this conversation • AI Coach is available 24/7
             </motion.div>

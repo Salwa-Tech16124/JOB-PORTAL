@@ -60,7 +60,7 @@ export function HeroSection() {
         >
           Your Career Journey,
           <br />
-          <span className="bg-gradient-to-r from-white via-purple-200 to-blue-200 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-white via-orange-200 to-blue-200 bg-clip-text text-transparent">
             Supercharged by AI
           </span>
         </motion.h1>

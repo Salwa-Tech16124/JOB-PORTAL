@@ -96,7 +96,7 @@ const recommendedCourses = [
     duration: "12 hours",
     rating: 4.7,
     icon: Briefcase,
-    color: "from-purple-500 to-pink-500"
+    color: "from-orange-500 to-blue-500"
   },
 ]
 

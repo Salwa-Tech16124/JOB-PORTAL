@@ -18,6 +18,7 @@ const MOCK_JOBS = [
     salary: '$150k - $200k',
     skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
     match: 95,
+    type: 'tech',
     description: 'Build scalable web applications with React and TypeScript'
   },
   {
@@ -28,6 +29,7 @@ const MOCK_JOBS = [
     salary: '$120k - $160k',
     skills: ['JavaScript', 'React', 'Python', 'AWS'],
     match: 88,
+    type: 'tech',
     description: 'Lead frontend and backend development for our platform'
   },
   {
@@ -38,6 +40,7 @@ const MOCK_JOBS = [
     salary: '$130k - $170k',
     skills: ['Node.js', 'PostgreSQL', 'Docker', 'Kubernetes'],
     match: 82,
+    type: 'tech',
     description: 'Design and maintain scalable backend systems'
   },
   {
@@ -48,6 +51,7 @@ const MOCK_JOBS = [
     salary: '$140k - $180k',
     skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD'],
     match: 78,
+    type: 'tech',
     description: 'Optimize deployment pipelines and infrastructure'
   },
   {
@@ -58,6 +62,7 @@ const MOCK_JOBS = [
     salary: '$135k - $175k',
     skills: ['Python', 'SQL', 'Apache Spark', 'AWS'],
     match: 72,
+    type: 'tech',
     description: 'Build data pipelines and analytics solutions'
   },
   {
@@ -68,6 +73,7 @@ const MOCK_JOBS = [
     salary: '$110k - $150k',
     skills: ['React', 'Tailwind', 'Figma', 'JavaScript'],
     match: 92,
+    type: 'tech',
     description: 'Create beautiful and responsive user interfaces'
   },
   {
@@ -78,6 +84,7 @@ const MOCK_JOBS = [
     salary: '$160k - $210k',
     skills: ['Python', 'TensorFlow', 'PyTorch', 'Data Science'],
     match: 68,
+    type: 'tech',
     description: 'Develop machine learning models and solutions'
   },
   {
@@ -88,7 +95,118 @@ const MOCK_JOBS = [
     salary: '$145k - $185k',
     skills: ['AWS', 'Azure', 'System Design', 'Leadership'],
     match: 75,
+    type: 'tech',
     description: 'Design enterprise-scale solutions for clients'
+  },
+  {
+    id: 9,
+    title: 'Backend Software Engineer',
+    company: 'CodeNest',
+    location: 'Remote',
+    salary: '$125k - $165k',
+    skills: ['Node.js', 'Express', 'MongoDB', 'AWS'],
+    match: 84,
+    type: 'tech',
+    description: 'Build resilient backend services and APIs for fast-growing products'
+  },
+  {
+    id: 10,
+    title: 'Frontend Developer',
+    company: 'PixelWave',
+    location: 'San Diego, CA',
+    salary: '$115k - $155k',
+    skills: ['React', 'Next.js', 'CSS', 'GraphQL'],
+    match: 90,
+    type: 'tech',
+    description: 'Craft responsive user interfaces with modern frontend frameworks'
+  },
+  {
+    id: 11,
+    title: 'Full Stack Developer',
+    company: 'VelocityTech',
+    location: 'Austin, TX',
+    salary: '$125k - $170k',
+    skills: ['React', 'Node.js', 'PostgreSQL', 'Docker'],
+    match: 87,
+    type: 'tech',
+    description: 'Implement end-to-end features across frontend and backend services'
+  },
+  {
+    id: 12,
+    title: 'Data Engineer II',
+    company: 'InsightWorks',
+    location: 'Seattle, WA',
+    salary: '$138k - $178k',
+    skills: ['Python', 'Airflow', 'BigQuery', 'ETL'],
+    match: 79,
+    type: 'tech',
+    description: 'Build and maintain analytics pipelines for large-scale data platforms'
+  },
+  {
+    id: 13,
+    title: 'ML Research Engineer',
+    company: 'DeepLogic',
+    location: 'Palo Alto, CA',
+    salary: '$165k - $215k',
+    skills: ['Python', 'PyTorch', 'NLP', 'Model Deployment'],
+    match: 70,
+    type: 'tech',
+    description: 'Research and deploy machine learning models for real-world applications'
+  },
+  {
+    id: 14,
+    title: 'Cloud Infrastructure Engineer',
+    company: 'NimbusOps',
+    location: 'Denver, CO',
+    salary: '$145k - $185k',
+    skills: ['AWS', 'Terraform', 'Kubernetes', 'CI/CD'],
+    match: 76,
+    type: 'tech',
+    description: 'Design cloud infrastructure and automation for scalable services'
+  },
+  {
+    id: 15,
+    title: 'HR Manager',
+    company: 'PeopleFirst',
+    location: 'Chicago, IL',
+    salary: '$85k - $105k',
+    skills: ['Recruiting', 'Employee Relations', 'HRIS', 'Compliance'],
+    match: 65,
+    type: 'non-tech',
+    description: 'Manage talent acquisition, employee engagement, and HR operations'
+  },
+  {
+    id: 16,
+    title: 'Marketing Executive',
+    company: 'GrowthPulse',
+    location: 'New York, NY',
+    salary: '$70k - $90k',
+    skills: ['Content Strategy', 'SEO', 'Campaign Management', 'Analytics'],
+    match: 60,
+    type: 'non-tech',
+    description: 'Execute multi-channel marketing campaigns and drive brand growth'
+  },
+  {
+    id: 17,
+    title: 'Sales Executive',
+    company: 'RevenueRise',
+    location: 'Boston, MA',
+    salary: '$75k - $95k',
+    skills: ['B2B Sales', 'CRM', 'Negotiation', 'Lead Generation'],
+    match: 62,
+    type: 'non-tech',
+    description: 'Build relationships and close sales opportunities for enterprise clients'
+  },
+  {
+    id: 18,
+    title: 'Business Analyst',
+    company: 'StrategyWorks',
+    location: 'Remote',
+    salary: '$80k - $100k',
+    skills: ['Data Analysis', 'Stakeholder Management', 'SQL', 'Process Improvement'],
+    match: 68,
+    type: 'non-tech',
+    description: 'Translate business needs into actionable requirements and insights'
   }
 ];
 

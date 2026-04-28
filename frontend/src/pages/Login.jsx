@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { motion } from 'framer-motion';
+import { api } from '../api';
 
 function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const toast = useToast();
@@ -42,36 +43,52 @@ function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     setLoading(true);
 
     try {
-      // Simulate API call
-      if (validateEmail(email) && validatePassword(password)) {
-        // Extract name from email (first part before @)
+      const response = await api.login(email, password);
+      if (response.success && response.data?.token) {
+        const { token, user } = response.data;
+        localStorage.setItem('token', token);
+
+        const profileResponse = await api.getProfile();
+        const profileData = profileResponse.success && profileResponse.data ? profileResponse.data : {};
+
         const nameFromEmail = email.split('@')[0].replace(/[._-]/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        
-        // Store user data in localStorage
+        const mergedProfile = {
+          ...profileData,
+          name: profileData.name?.trim() ? profileData.name : undefined,
+          profilePicture: profileData.profilePicture || undefined,
+          skills: Array.isArray(profileData.skills) ? profileData.skills : (user.skills || []),
+          experience: profileData.experience ?? user.experience ?? '',
+          bio: profileData.bio ?? user.bio ?? '',
+          education: profileData.education ?? user.education ?? ''
+        };
+
         const userData = {
-          email,
-          name: nameFromEmail,
-          role: 'Professional',
+          ...user,
+          ...mergedProfile,
+          name: mergedProfile.name || user.name || nameFromEmail,
+          profilePicture: mergedProfile.profilePicture || user.profilePicture,
           loginTime: new Date().toISOString()
         };
-        
+
         localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', 'dummy-token-' + Date.now());
-        
+
         toast.success('Welcome back!', 'Login Successful');
-        
+
+        window.dispatchEvent(new Event('loginSuccess'));
+        window.dispatchEvent(new Event('userUpdated'));
+
         // Reset form
         setEmail('');
         setPassword('');
         setTouched({ email: false, password: false });
-        
+
         // Close modal and trigger success callback
         setTimeout(() => {
           onClose();
           onLoginSuccess?.();
         }, 500);
       } else {
-        toast.error('Invalid email or password', 'Login Failed');
+        toast.error(response.message || 'Invalid email or password', 'Login Failed');
       }
     } catch (err) {
       toast.error('Login failed. Please try again.', 'Error');

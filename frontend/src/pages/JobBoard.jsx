@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, Filter, TrendingUp, ChevronRight, AlertCircle, ArrowRight, CheckCircle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
@@ -9,95 +9,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import JobCard from '../components/JobCard';
 import LoginModal from './Login';
 import SignupModal from './Signup';
-
-// Mock Job Data
-const MOCK_JOBS = [
-  {
-    id: 1,
-    title: 'Senior React Developer',
-    company: 'TechCorp Inc',
-    location: 'San Francisco, CA',
-    salary: '$150k - $200k',
-    skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
-    match: 95,
-    description: 'Build scalable web applications with React and TypeScript'
-  },
-  {
-    id: 2,
-    title: 'Full Stack Engineer',
-    company: 'StartupXYZ',
-    location: 'Remote',
-    salary: '$120k - $160k',
-    skills: ['JavaScript', 'React', 'Python', 'AWS'],
-    match: 88,
-    description: 'Lead frontend and backend development for our platform'
-  },
-  {
-    id: 3,
-    title: 'Backend Developer',
-    company: 'CloudSys Ltd',
-    location: 'New York, NY',
-    salary: '$130k - $170k',
-    skills: ['Node.js', 'PostgreSQL', 'Docker', 'Kubernetes'],
-    match: 82,
-    description: 'Design and maintain scalable backend systems'
-  },
-  {
-    id: 4,
-    title: 'DevOps Engineer',
-    company: 'InfraCloud',
-    location: 'Seattle, WA',
-    salary: '$140k - $180k',
-    skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD'],
-    match: 78,
-    description: 'Optimize deployment pipelines and infrastructure'
-  },
-  {
-    id: 5,
-    title: 'Data Engineer',
-    company: 'DataMind',
-    location: 'Boston, MA',
-    salary: '$135k - $175k',
-    skills: ['Python', 'SQL', 'Apache Spark', 'AWS'],
-    match: 72,
-    description: 'Build data pipelines and analytics solutions'
-  },
-  {
-    id: 6,
-    title: 'Frontend Specialist',
-    company: 'DesignStudio',
-    location: 'Austin, TX',
-    salary: '$110k - $150k',
-    skills: ['React', 'Tailwind', 'Figma', 'JavaScript'],
-    match: 92,
-    description: 'Create beautiful and responsive user interfaces'
-  },
-  {
-    id: 7,
-    title: 'ML Engineer',
-    company: 'AI Labs',
-    location: 'San Jose, CA',
-    salary: '$160k - $210k',
-    skills: ['Python', 'TensorFlow', 'PyTorch', 'Data Science'],
-    match: 68,
-    description: 'Develop machine learning models and solutions'
-  },
-  {
-    id: 8,
-    title: 'Solutions Architect',
-    company: 'Enterprise Co',
-    location: 'Chicago, IL',
-    salary: '$145k - $185k',
-    skills: ['AWS', 'Azure', 'System Design', 'Leadership'],
-    match: 75,
-    description: 'Design enterprise-scale solutions for clients'
-  }
-];
+import { api } from '../api';
 
 function JobBoard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
-  const [jobs, setJobs] = useState(MOCK_JOBS);
+  const [jobs, setJobs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [sortBy, setSortBy] = useState('match'); // 'match' or 'salary'
@@ -106,31 +25,70 @@ function JobBoard() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [signupModalOpen, setSignupModalOpen] = useState(false);
 
-  // Check if user is logged in
+  // Fetch live jobs and applications from backend
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    if (user && token) {
-      setIsLoggedIn(true);
-    } else {
-      setIsLoggedIn(false);
-    }
+    const checkLoginAndFetchData = async () => {
+      const user = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
+      const isLogged = !!(user && token);
+      setIsLoggedIn(isLogged);
+
+      try {
+        setIsLoading(true);
+        // Fetch Jobs
+        const jobsRes = await api.getJobs();
+        if (jobsRes.success) {
+          setJobs(jobsRes.data);
+        }
+
+        // If logged in, fetch user's previous applications to update "Applied" button UI
+        if (isLogged) {
+          const appsRes = await api.getApplications();
+          if (appsRes.success) {
+            const appliedJobIds = new Set(appsRes.data.map(app => app.jobId));
+            setApplied(appliedJobIds);
+          }
+        }
+      } catch (err) {
+        toast.error('Failed to communicate with server');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkLoginAndFetchData();
+    
+    // Listen for login success from modal
+    const handleLoginSuccess = () => checkLoginAndFetchData();
+    window.addEventListener('loginSuccess', handleLoginSuccess);
+    return () => window.removeEventListener('loginSuccess', handleLoginSuccess);
   }, []);
 
-  // Get all available skills
-  const allSkills = Array.from(new Set(MOCK_JOBS.flatMap(job => job.skills))).sort();
+  useEffect(() => {
+    const query = new URLSearchParams(location.search).get('q') || '';
+    if (query && query !== searchTerm) {
+      setSearchTerm(query);
+    }
+  }, [location.search]);
 
-  // Filter and Sort Jobs
-  const filteredJobs = jobs
+  // Get all available skills dynamically
+  const allSkills = Array.from(new Set(jobs.flatMap(job => job.skills || []))).sort();
+
+  const searchQuery = searchTerm.trim().toLowerCase();
+
+  const searchMatches = jobs.filter(job => {
+    return (
+      searchQuery === '' ||
+      job.title.toLowerCase().includes(searchQuery) ||
+      job.company.toLowerCase().includes(searchQuery) ||
+      (job.skills || []).some(skill => skill.toLowerCase().includes(searchQuery))
+    );
+  });
+
+  const filteredJobs = searchMatches
     .filter(job => {
-      const matchesSearch = 
-        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.company.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesSkills = selectedSkills.length === 0 || 
-        selectedSkills.some(skill => job.skills.includes(skill));
-      
-      return matchesSearch && matchesSkills;
+      return selectedSkills.length === 0 || 
+        selectedSkills.some(skill => (job.skills || []).includes(skill));
     })
     .sort((a, b) => {
       if (sortBy === 'match') {
@@ -138,6 +96,14 @@ function JobBoard() {
       }
       return 0;
     });
+
+  const searchSuggestions = searchQuery === ''
+    ? []
+    : jobs.filter(job => (
+        job.title.toLowerCase().includes(searchQuery) ||
+        job.company.toLowerCase().includes(searchQuery) ||
+        (job.skills || []).some(skill => skill.toLowerCase().includes(searchQuery))
+      )).slice(0, 5);
 
   // Featured Jobs (Top 4 by match)
   const featuredJobs = [...jobs].sort((a, b) => b.match - a.match).slice(0, 4);
@@ -150,23 +116,33 @@ function JobBoard() {
     );
   };
 
-  const handleApply = (jobId) => {
+  const handleApply = async (jobId) => {
     if (!isLoggedIn) {
       setLoginModalOpen(true);
       return;
     }
-    setApplied(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(jobId)) {
-        newSet.delete(jobId);
-        toast.info('Application withdrawn', 'Removed');
+    
+    if (applied.has(jobId)) {
+      toast.info('You have already applied to this position.', 'Already Applied');
+      return;
+    }
+
+    try {
+      const res = await api.applyJob(jobId);
+      if (res.success) {
+        setApplied(prev => {
+          const newSet = new Set(prev);
+          newSet.add(jobId);
+          return newSet;
+        });
+        const jobName = jobs.find(j => j.id === jobId)?.title || 'Job';
+        toast.success(`Your application for ${jobName} has been submitted!`, 'Application Sent');
       } else {
-        newSet.add(jobId);
-        const job = MOCK_JOBS.find(j => j.id === jobId);
-        toast.success(`Applied to ${job.title}!`, 'Application Sent');
+        toast.error(res.message || 'Failed to apply');
       }
-      return newSet;
-    });
+    } catch (e) {
+      toast.error('Server connection failed');
+    }
   };
 
   const handleEnterDashboard = () => {
@@ -195,6 +171,10 @@ function JobBoard() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="space-y-4"
             >
+              <div className="flex items-center gap-2 justify-center">
+                <img src="/logo.png" alt="JobPortal Logo" className="h-8 w-auto object-contain" />
+                <span className="font-semibold text-lg text-foreground">JobPortal</span>
+              </div>
               <h1 className="text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary via-primary/80 to-primary/60">
                 Your Next Opportunity Awaits
               </h1>
@@ -315,14 +295,16 @@ function JobBoard() {
   }
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="space-y-2"
-      >
+    <div className="flex-1">
+      <div className="max-w-[1200px] mx-auto px-6 md:px-10 lg:px-16 py-6">
+        <div className="space-y-8 pb-12">
+          {/* Header */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="space-y-2"
+          >
         <h1 className="text-4xl font-bold">Job Opportunities</h1>
         <p className="text-muted-foreground text-lg">
           {filteredJobs.length} {filteredJobs.length === 1 ? 'position' : 'positions'} matching your profile
@@ -361,13 +343,13 @@ function JobBoard() {
                     <span className="text-sm font-semibold text-emerald-500">{job.salary}</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-4">
-                    {job.skills.slice(0, 3).map(skill => (
+                    {(job.skills || []).slice(0, 3).map(skill => (
                       <span key={skill} className="text-xs bg-background/50 text-muted-foreground px-2 py-1 rounded">
                         {skill}
                       </span>
                     ))}
-                    {job.skills.length > 3 && (
-                      <span className="text-xs text-muted-foreground px-2 py-1">+{job.skills.length - 3}</span>
+                    {(job.skills || []).length > 3 && (
+                      <span className="text-xs text-muted-foreground px-2 py-1">+{(job.skills || []).length - 3}</span>
                     )}
                   </div>
                   <Button 
@@ -393,14 +375,47 @@ function JobBoard() {
         className="space-y-4"
       >
         {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-4 top-3.5 w-5 h-5 text-muted-foreground/60" />
-          <Input 
-            placeholder="Search by job title or company..." 
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-12 py-6 text-[15px]"
-          />
+        <div className="space-y-2 relative">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-3.5 w-5 h-5 text-muted-foreground/60" />
+              <Input 
+                placeholder="Search by job title, company, or skill..." 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-12 py-6 text-[15px]"
+              />
+            </div>
+            <Button 
+              size="sm"
+              onClick={() => setSearchTerm(searchTerm.trim())}
+              className="min-w-[120px] py-6"
+            >
+              Search
+            </Button>
+          </div>
+
+          {searchTerm.trim().length > 0 && (
+            <div className="absolute left-0 right-0 z-20 mt-1 bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
+              {searchSuggestions.length > 0 ? (
+                searchSuggestions.map(job => (
+                  <button
+                    key={job.id}
+                    onClick={() => setSearchTerm(job.title)}
+                    className="w-full text-left px-4 py-3 hover:bg-primary/10 transition-colors"
+                  >
+                    <div className="flex justify-between items-center gap-3">
+                      <span className="font-medium text-foreground">{job.title}</span>
+                      <span className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Job</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{job.company}</p>
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-3 text-sm text-muted-foreground">No results found</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Skill Filters */}
@@ -459,15 +474,14 @@ function JobBoard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.3 }}
-        className="space-y-3"
       >
         {filteredJobs.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredJobs.map((job, index) => (
               <motion.div
                 key={job.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
               >
                 <JobCard 
@@ -484,7 +498,7 @@ function JobBoard() {
             animate={{ opacity: 1 }}
             className="text-center py-12"
           >
-            <p className="text-muted-foreground text-lg mb-2">No jobs found</p>
+            <p className="text-muted-foreground text-lg mb-2">No results found</p>
             <p className="text-muted-foreground text-sm">Try adjusting your filters or search term</p>
             <Button 
               size="sm" 
@@ -518,6 +532,8 @@ function JobBoard() {
           toast.success('Account created successfully!', 'Welcome');
         }}
       />
+        </div>
+      </div>
     </div>
   );
 }
