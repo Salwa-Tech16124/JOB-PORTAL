@@ -1,103 +1,176 @@
 # 🚀 AI-Powered Job Portal
 
-Welcome to the **AI Job Portal**! This is a modern, full-stack application designed to revolutionize the job search and recruitment process. Built with a premium, glassmorphism-inspired UI and powered by advanced AI integrations, it provides intelligent tools for both job seekers and employers.
+A modern, full-stack job portal powered by **Sarvam AI** — featuring intelligent resume analysis, career coaching, interview simulation, and smart job matching.
+
+> **Zero-config setup**: Clone → Run `setup.bat` → Run `start-all.bat` → Done.
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-### For Candidates (Job Seekers)
-*   **🤖 AI Career Coach:** Get personalized career roadmaps, skill gap analysis, and learning recommendations tailored to your specific role and goals (powered by Google Gemini / OpenAI).
-*   **🎤 Interview Simulator:** Practice for technical interviews with dynamic, AI-generated questions specific to your target job role.
-*   **📊 Job Application Tracking:** Easily track the status of your applications, manage your profile, and monitor your progress through an intuitive dashboard.
-*   **✨ Modern & Responsive UI:** Experience a stunning, highly interactive UI featuring modern aesthetics (Tailwind CSS, shadcn/ui, framer-motion).
+### For Candidates
+| Feature | Description |
+|---|---|
+| 🤖 **AI Career Coach** | Personalized roadmaps, skill gap analysis, salary guidance — powered by Sarvam AI (`sarvam-105b`) |
+| 📄 **Resume Architect** | Upload `.pdf` or `.docx` resumes — AI extracts skills, scores the resume, identifies missing sections |
+| 💡 **AI Suggestions** | Get specific, role-tailored improvement suggestions for your resume |
+| ✨ **Auto-Improve Resume** | One-click AI rewrite of your summary, experience, and education sections |
+| 🎤 **Interview Simulator** | Practice with dynamic AI-generated interview questions for your target role |
+| 📊 **Application Tracker** | Track all job applications and their statuses from one dashboard |
 
 ### For Employers
-*   **📝 Job Posting & Management:** Seamlessly post new job openings and manage listings.
-*   **🧠 Smart Applicant Parsing & Matching:** Utilize AI to accurately extract skills from applications, parse job descriptions, and intelligently match candidates to the right roles.
-*   **🛡️ Fraud Detection:** Benefit from rule-based and AI-assisted fraud detection mechanisms to ensure application authenticity.
+| Feature | Description |
+|---|---|
+| 📝 **Job Posting** | Post and manage job listings with skill requirements |
+| 🧠 **Smart Matching** | AI-assisted candidate-to-job matching based on extracted skills |
+| 🛡️ **Fraud Detection** | Rule-based and AI-assisted fraud detection on applications |
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-*   **Framework:** React 18 (via Vite)
-*   **Styling:** Tailwind CSS, css-variables for custom theming
-*   **UI Components:** Radix UI / shadcn/ui
-*   **Animations:** Framer Motion
-*   **Data Visualization:** Recharts
-*   **Routing:** React Router DOM
-*   **Form Management:** React Hook Form
+- **React 18** with Vite
+- **Tailwind CSS** + shadcn/ui (Radix UI)
+- **Framer Motion** for animations
+- **React Router DOM**, React Hook Form, Recharts
 
 ### Backend
-*   **Environment:** Node.js with Express.js
-*   **Database:** MongoDB (using Mongoose)
-*   **Authentication:** JWT (JSON Web Tokens) & bcrypt
-*   **AI Integrations:** Google Generative AI (`@google/generative-ai`), OpenAI (`openai`)
-*   **API Security:** CORS, dotenv for environment variables management
+- **Node.js** + **Express.js**
+- **Persistent File Database** (`backend/local_db/db.json`) — no MongoDB required
+- **JWT** authentication + **bcrypt** password hashing
+- **Sarvam AI** via OpenAI-compatible SDK (`sarvam-105b` model)
+- **mammoth** (`.docx` parsing) + **pdf-parse** (`.pdf` parsing)
+
+### AI Service (Python)
+- **FastAPI** + **Uvicorn**
+- Agent endpoints for profile analysis, fraud detection, job matching
 
 ---
 
-## 🚀 Getting Started
+## 📋 Requirements
 
-Follow these steps to get the project running locally.
+| Requirement | Version | Download |
+|---|---|---|
+| **Node.js** | v18 or higher | [nodejs.org](https://nodejs.org/) |
+| **Python** | v3.9 or higher | [python.org](https://python.org/) |
+| **Git** | Any recent version | [git-scm.com](https://git-scm.com/) |
 
-### 1. Prerequisites
-*   [Node.js](https://nodejs.org/) (v16 or higher recommended)
-*   [MongoDB](https://www.mongodb.com/) (Local instance or MongoDB Atlas cluster)
-*   A Free **Google Gemini API Key** (Get it at [Google AI Studio](https://aistudio.google.com/))
-
-### 2. Backend Setup
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Configure Environment Variables:
-   Create a `.env` file in the `backend/` directory and add the necessary keys (including your Gemini/OpenAI keys, MongoDB URI, and JWT Secret).
-   *Refer to [GEMINI_API_SETUP_REQUIRED.md](./GEMINI_API_SETUP_REQUIRED.md) for detailed instructions.*
-4. Start the backend server:
-   ```bash
-   npm start
-   ```
-
-### 3. Frontend Setup
-1. Open a new terminal and navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-4. Access the application in your browser at `http://localhost:5173`.
+> **No MongoDB, no cloud DB, no paid API keys needed.** Everything is pre-configured.
 
 ---
 
-## 📚 Extensive Documentation
+## 🚀 Quick Start (Windows)
 
-We have comprehensive documentation covering all aspects of the system. If you want to dive deeper, check out these guides located in the root directory:
+### Step 1 — Clone the repository
+```bash
+git clone https://github.com/Salwa-Tech16124/JOB-PORTAL.git
+cd JOB-PORTAL
+```
 
-*   **[IMMEDIATE_ACTION_PLAN.md](./IMMEDIATE_ACTION_PLAN.md):** ⭐ Start here to get the system working in 5 minutes!
-*   **[ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md):** Complete system design, data flow diagrams, and structure overview.
-*   **[DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md):** Master index for all available documentation.
-*   **[TESTING_GUIDE.md](./TESTING_GUIDE.md):** Test scenarios and quality checklists.
-*   **[COMPLETE_FIX_SUMMARY.md](./COMPLETE_FIX_SUMMARY.md):** Technical overview of recent system enhancements.
+### Step 2 — Run the auto-setup (once only)
+```
+Double-click: setup.bat
+```
+This will automatically:
+- ✅ Check that Node.js and Python are installed
+- ✅ Install all backend npm packages (`mammoth`, `pdf-parse`, `openai`, etc.)
+- ✅ Install all frontend npm packages
+- ✅ Install Python packages (`fastapi`, `uvicorn`, `pydantic`)
+- ✅ Create `backend/.env` with the Sarvam AI key pre-filled
+
+### Step 3 — Start all services
+```
+Double-click: start-all.bat
+```
+This launches 3 windows:
+| Service | URL |
+|---|---|
+| 🖥️ Frontend (React) | http://localhost:5173 |
+| ⚙️ Backend (Node.js) | http://localhost:5000 |
+| 🐍 AI Service (Python) | http://localhost:8000 |
+
+Your browser will open automatically to `http://localhost:5173`.
 
 ---
 
-## 🤝 Contributing
+## 🔑 Environment Variables
 
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page if you want to contribute.
+The `setup.bat` creates `backend/.env` automatically. Contents:
+
+```env
+# Sarvam AI — pre-configured, no changes needed
+SARVAM_API_KEY=sk_xs5dbt92_YCfO5S7AF3b9DIQxznmH8tao
+
+# JWT Secret — change in production
+JWT_SECRET=ai-job-portal-jwt-secret-2024
+
+# Server port
+PORT=5000
+```
+
+> **Note:** `.env` is in `.gitignore` and will never be committed to the repo.
+
+---
+
+## 📁 Project Structure
+
+```
+JOB-PORTAL/
+├── setup.bat                  ← Run once after cloning
+├── start-all.bat              ← Run every time to start the app
+│
+├── frontend/                  ← React + Vite app (port 5173)
+│   └── src/pages/
+│       ├── Profile.jsx        ← Resume Architect + AI features
+│       ├── Coach.jsx          ← AI Career Coach
+│       ├── Interview.jsx      ← Interview Simulator
+│       ├── JobBoard.jsx       ← Job listings
+│       └── Dashboard.jsx      ← Overview & applications
+│
+├── backend/                   ← Node.js + Express (port 5000)
+│   ├── server.js              ← Main server, all API routes
+│   ├── local_db/db.json       ← Persistent local database (auto-created)
+│   ├── .env                   ← API keys (auto-created by setup.bat)
+│   └── services/
+│       ├── careerCoachAgent.js ← Sarvam AI career coaching
+│       ├── resumeAgent.js      ← Sarvam AI resume analysis
+│       └── promptBuilder.js    ← Prompt templates
+│
+└── ai-service/                ← Python FastAPI (port 8000)
+    ├── main.py                ← Agent endpoints
+    └── requirements.txt       ← Python dependencies
+```
+
+---
+
+## 🧪 How to Use
+
+### As a Candidate
+1. **Register** at `http://localhost:5173` → click "Sign Up" → choose "I am a Candidate"
+2. **Fill your profile** on the AI Profile page (name, role, skills, experience)
+3. **Upload your resume** (PDF or DOCX) → click **Analyze Resume**
+4. Click **Get Suggestions** → AI gives you specific improvement tips
+5. Click **Improve Resume** → AI rewrites your summary and experience sections
+6. Browse jobs on **Job Board** and apply
+7. Chat with the **AI Career Coach** for roadmaps and interview prep
+8. Practice on **Interview Prep** with AI-generated questions
+
+### As an Employer
+1. **Register** → choose "I am an Employer"
+2. Post jobs from the **Dashboard**
+3. View and manage applications
+
+---
+
+## 💾 Data Persistence
+
+User accounts, profiles, and applications are saved to `backend/local_db/db.json`. Your data **survives server restarts** automatically.
+
+> This file is in `.gitignore` — it stays local and is never pushed to GitHub.
+
+---
 
 ## 📄 License
 
-This project is proprietary and confidential. All rights reserved.
+This project is proprietary. All rights reserved — © Salwa Kazmi.

@@ -19,14 +19,6 @@ Thumbs.db
 # Vite builds
 dist/
 dist-ssr/
-# v0 sandbox internal files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-.snowflake/
-.v0-trash/
-.vercel/
-next.user-config.*
 
 # Environment variables
 .env*.local
@@ -35,3 +27,10 @@ next.user-config.*
 node_modules
 .next/
 .DS_Store
+
+# Local persistent database (user data - do not commit)
+backend/local_db/db.json
+
+# Test / temp files
+backend/test_docx.mjs
+*.docx
