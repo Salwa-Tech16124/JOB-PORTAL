@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "50b84fe63c251aae11f4ea8b968b9a08a69a03c8",
+  "prompts": {
+    "b18ba7b24a949e9c": {
+      "agent_id": {
+        "tool": "github-copilot",
+        "id": "9c6b5b0c-d3e8-4f5d-ad33-b848c69aa78e",
+        "model": "copilot/auto"
+      },
+      "human_author": "Salwa Kazmi",
+      "messages": [],
+      "total_additions": 561,
+      "total_deletions": 199,
+      "accepted_lines": 1873,
+      "overriden_lines": 1
+    }
+  }
+}
