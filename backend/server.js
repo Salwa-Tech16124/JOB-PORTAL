@@ -6,6 +6,11 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
+import mammoth from 'mammoth';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 // Load environment variables with explicit path
 const __filename = fileURLToPath(import.meta.url);
@@ -14,15 +19,16 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // Import AI Career Coach Agent
 import { getCareerAdvice as coachProcessMessage, getStatus as getCoachStatus } from './services/careerCoachAgent.js';
+import { analyzeResumeWithAI, getSuggestionsWithAI, improveResumeWithAI } from './services/resumeAgent.js';
 
 const app = express();
 
-// Initialize OpenAI API
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_API_KEY) {
-  console.warn('⚠️ OPENAI_API_KEY not found in .env file.');
-}
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+// Initialize Sarvam AI (via OpenAI SDK)
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY || "sk_xs5dbt92_YCfO5S7AF3b9DIQxznmH8tao";
+const openai = new OpenAI({ 
+    apiKey: SARVAM_API_KEY,
+    baseURL: "https://api.sarvam.ai/v1"
+});
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb', parameterLimit: 100000 }));
@@ -39,63 +45,38 @@ const standardResponse = (res, success, data, message, statusCode = 200) => {
     return res.status(statusCode).json({ success, data, message });
 };
 
-// ============== IN-MEMORY DATABASE ==============
-const database = {
+// ============== PERSISTENT FILE DATABASE ==============
+const DB_FILE = path.resolve(__dirname, 'local_db', 'db.json');
+
+// Default state when no saved DB exists
+const DEFAULT_DB = {
   users: [],
-  jobs: [],
   profiles: [],
   applications: [],
   nextUserId: 1,
-  nextJobId: 9,
   nextProfileId: 1,
-  nextAppId: 1
+  nextAppId: 1,
+  nextJobId: 19
 };
 
-// Helper functions for database operations
-const findUserByEmail = (email) => database.users.find(u => u.email === email);
-const findUserById = (id) => database.users.find(u => u.id === id);
-const createUser = (email, hashedPassword, role) => {
-  const user = { id: database.nextUserId++, email, password: hashedPassword, role, createdAt: new Date() };
-  database.users.push(user);
-  return user;
-};
+// Load database from file or start fresh
+let database;
+try {
+  if (fs.existsSync(DB_FILE)) {
+    const raw = fs.readFileSync(DB_FILE, 'utf8');
+    const saved = JSON.parse(raw);
+    database = { ...DEFAULT_DB, ...saved };
+    console.log(`✅ Database loaded: ${saved.users?.length || 0} users, ${saved.profiles?.length || 0} profiles, ${saved.applications?.length || 0} applications`);
+  } else {
+    database = { ...DEFAULT_DB };
+    console.log('📂 No saved database found, starting fresh.');
+  }
+} catch (err) {
+  console.warn('⚠️ Failed to load DB file, starting fresh:', err.message);
+  database = { ...DEFAULT_DB };
+}
 
-const createProfile = (userId, data) => {
-  const profile = { id: database.nextProfileId++, userId, ...data, createdAt: new Date() };
-  database.profiles.push(profile);
-  return profile;
-};
-
-const createJob = (title, company, description, employerId, location = 'Remote', salary = 'Not Specified', skills = []) => {
-  const job = { 
-    id: database.nextJobId++, 
-    title, 
-    company, 
-    description, 
-    employerId, 
-    location,
-    salary,
-    skills,
-    createdAt: new Date(),
-    match: Math.floor(Math.random() * 40) + 60 // Mock match percentage for new jobs
-  };
-  database.jobs.push(job);
-  return job;
-};
-
-const createApplication = (jobId, candidateId) => {
-  const application = {
-    id: database.nextAppId++,
-    jobId: parseInt(jobId),
-    candidateId,
-    status: 'Applied', // Status can be: Applied, Viewed by Company, Accepted, Rejected
-    appliedAt: new Date()
-  };
-  database.applications.push(application);
-  return application;
-};
-
-// Seed Mock Jobs
+// Mock jobs always seeded fresh (not persisted)
 const MOCK_JOBS = [
   { id: 1, title: 'Senior React Developer', company: 'TechCorp Inc', location: 'San Francisco, CA', salary: '$150k - $200k', skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'], match: 95, type: 'tech', description: 'Build scalable web applications with React and TypeScript', employerId: null },
   { id: 2, title: 'Full Stack Engineer', company: 'StartupXYZ', location: 'Remote', salary: '$120k - $160k', skills: ['JavaScript', 'React', 'Python', 'AWS'], match: 88, type: 'tech', description: 'Lead frontend and backend development for our platform', employerId: null },
@@ -116,7 +97,33 @@ const MOCK_JOBS = [
   { id: 17, title: 'Sales Executive', company: 'RevenueRise', location: 'Boston, MA', salary: '$75k - $95k', skills: ['B2B Sales', 'CRM', 'Negotiation', 'Lead Generation'], match: 62, type: 'non-tech', description: 'Build relationships and close sales opportunities for enterprise clients', employerId: null },
   { id: 18, title: 'Business Analyst', company: 'StrategyWorks', location: 'Remote', salary: '$80k - $100k', skills: ['Data Analysis', 'Stakeholder Management', 'SQL', 'Process Improvement'], match: 68, type: 'non-tech', description: 'Translate business needs into actionable requirements and insights', employerId: null }
 ];
-database.jobs = [...MOCK_JOBS];
+
+// Merge mock jobs with any employer-posted jobs saved to disk
+const savedEmployerJobs = (database.jobs || []).filter(j => j.employerId !== null);
+database.jobs = [...MOCK_JOBS, ...savedEmployerJobs];
+
+// Save database to file (debounced — max once per 500ms)
+let saveTimer = null;
+const saveDatabase = () => {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      const toSave = {
+        users: database.users,
+        profiles: database.profiles,
+        applications: database.applications,
+        jobs: database.jobs.filter(j => j.employerId !== null), // only employer-posted jobs
+        nextUserId: database.nextUserId,
+        nextProfileId: database.nextProfileId,
+        nextAppId: database.nextAppId,
+        nextJobId: database.nextJobId
+      };
+      fs.writeFileSync(DB_FILE, JSON.stringify(toSave, null, 2), 'utf8');
+    } catch (err) {
+      console.error('❌ Failed to save database:', err.message);
+    }
+  }, 500);
+};
 
 const ROLE_SKILL_MAP = {
   'Software Engineer': ['JavaScript', 'TypeScript', 'Node.js', 'React', 'APIs', 'Git'],
@@ -133,6 +140,49 @@ const ROLE_SKILL_MAP = {
   'Business Analyst': ['Requirements Gathering', 'Process Mapping', 'Stakeholder Alignment', 'UAT', 'Reporting'],
   'Project Manager': ['Planning', 'Risk Management', 'Communication', 'Scrum', 'Budgeting', 'Delivery'],
   'Machine Learning Engineer': ['Python', 'TensorFlow', 'PyTorch', 'Model Deployment', 'Data Pipelines', 'ML Ops']
+};
+
+// Database helper functions
+const findUserByEmail = (email) => database.users.find(u => u.email === email);
+const findUserById = (id) => database.users.find(u => u.id === id);
+
+const createUser = (email, hashedPassword, role) => {
+  const user = { id: database.nextUserId++, email, password: hashedPassword, role, createdAt: new Date() };
+  database.users.push(user);
+  saveDatabase();
+  return user;
+};
+
+const createProfile = (userId, data) => {
+  const profile = { id: database.nextProfileId++, userId, ...data, createdAt: new Date() };
+  database.profiles.push(profile);
+  saveDatabase();
+  return profile;
+};
+
+const createJob = (title, company, description, employerId, location = 'Remote', salary = 'Not Specified', skills = []) => {
+  const job = {
+    id: database.nextJobId++,
+    title, company, description, employerId, location, salary, skills,
+    createdAt: new Date(),
+    match: Math.floor(Math.random() * 40) + 60
+  };
+  database.jobs.push(job);
+  saveDatabase();
+  return job;
+};
+
+const createApplication = (jobId, candidateId) => {
+  const application = {
+    id: database.nextAppId++,
+    jobId: parseInt(jobId),
+    candidateId,
+    status: 'Applied',
+    appliedAt: new Date()
+  };
+  database.applications.push(application);
+  saveDatabase();
+  return application;
 };
 
 const normalizeResumeText = (rawText) => {
@@ -254,15 +304,43 @@ const buildResumeAnalysis = (rawText, fileName, fileType, profileRole, profileSk
   };
 };
 
-const createResumeText = (fileName, fileType, fileData) => {
+/**
+ * Async resume text extractor — properly handles .docx (mammoth), .pdf (pdf-parse),
+ * and falls back to raw buffer text for plain .txt files.
+ */
+const extractResumeText = async (fileName, fileType, fileData) => {
   if (!fileData) return '';
-  const binaryBuffer = Buffer.from(fileData, 'base64');
-  let text = binaryBuffer.toString('utf8');
-  if (text.length < 40) {
-    text = binaryBuffer.toString('latin1');
+  const buffer = Buffer.from(fileData, 'base64');
+  const name = (fileName || '').toLowerCase();
+  const type = (fileType || '').toLowerCase();
+
+  try {
+    // .docx — Word document (OpenXML)
+    if (name.endsWith('.docx') || type.includes('wordprocessingml') || type.includes('officedocument')) {
+      const result = await mammoth.extractRawText({ buffer });
+      const text = result.value || '';
+      console.log(`📄 Mammoth extracted ${text.length} chars from ${fileName}`);
+      return normalizeResumeText(text);
+    }
+
+    // .pdf
+    if (name.endsWith('.pdf') || type.includes('pdf')) {
+      const result = await pdfParse(buffer);
+      const text = result.text || '';
+      console.log(`📄 pdf-parse extracted ${text.length} chars from ${fileName}`);
+      return normalizeResumeText(text);
+    }
+  } catch (parseErr) {
+    console.warn(`⚠️ File parser failed for ${fileName}:`, parseErr.message);
   }
+
+  // Fallback: plain text / unknown formats
+  let text = buffer.toString('utf8');
+  if (text.length < 40) text = buffer.toString('latin1');
+  console.log(`📄 Raw text fallback: ${text.length} chars from ${fileName}`);
   return normalizeResumeText(text);
 };
+
 
 const buildSuggestionsForProfile = (profile = {}, analysis = {}) => {
   const suggestions = [];
@@ -542,50 +620,94 @@ app.put('/api/applications/:id/status', authMiddleware, async (req, res) => {
     }
     
     application.status = status;
+    saveDatabase();
     return standardResponse(res, true, application, 'Status updated');
   } catch (e) {
     return standardResponse(res, false, null, e.message, 500);
   }
 });
 
+// ── RESUME ANALYZE (Sarvam AI-powered) ──────────────────────────────────────
 app.post('/api/profile/resume-analyze', authMiddleware, async (req, res) => {
   try {
       const { fileName, fileType, fileData } = req.body;
       if (!fileName || !fileData) {
         return standardResponse(res, false, null, 'Resume file information is required', 400);
       }
-      const rawText = createResumeText(fileName, fileType, fileData);
+
+      // Properly extract text from .docx / .pdf / plain text
+      const rawText = await extractResumeText(fileName, fileType, fileData);
+      console.log(`📝 Resume text preview (first 200 chars): ${rawText.slice(0, 200)}`);
+
       const profile = database.profiles.find(p => p.userId === req.user.id) || {};
-      const analysis = buildResumeAnalysis(rawText, fileName, fileType, profile.role || req.user.role, profile.skills || []);
-      return standardResponse(res, true, analysis, 'Resume analyzed successfully');
+
+      try {
+        const analysis = await analyzeResumeWithAI(
+          rawText, fileName, fileType,
+          profile.role || req.user.role,
+          profile.skills || []
+        );
+        return standardResponse(res, true, analysis, 'Resume analyzed by Sarvam AI');
+      } catch (aiErr) {
+        console.warn('⚠️ Sarvam AI analysis failed, using rule-based fallback:', aiErr.message);
+        const analysis = buildResumeAnalysis(rawText, fileName, fileType, profile.role || req.user.role, profile.skills || []);
+        return standardResponse(res, true, { ...analysis, aiPowered: false }, 'Resume analyzed (rule-based fallback)');
+      }
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
   }
 });
 
+// ── GET SUGGESTIONS (Sarvam AI-powered) ─────────────────────────────────────
 app.post('/api/profile/suggestions', authMiddleware, async (req, res) => {
   try {
       const profile = req.body.profile || database.profiles.find(p => p.userId === req.user.id) || {};
       const analysis = req.body.resumeAnalysis || {};
-      const suggestions = buildSuggestionsForProfile(profile, analysis);
-      return standardResponse(res, true, suggestions, 'Suggestions generated successfully');
+
+      try {
+        const suggestions = await getSuggestionsWithAI(profile, analysis);
+        return standardResponse(res, true, suggestions, 'AI suggestions generated by Sarvam AI');
+      } catch (aiErr) {
+        console.warn('⚠️ Sarvam AI suggestions failed, using rule-based fallback:', aiErr.message);
+        const suggestions = buildSuggestionsForProfile(profile, analysis);
+        return standardResponse(res, true, { ...suggestions, aiPowered: false }, 'Suggestions generated (rule-based fallback)');
+      }
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
   }
 });
 
+// ── IMPROVE RESUME (Sarvam AI-powered) ──────────────────────────────────────
 app.post('/api/profile/improve', authMiddleware, async (req, res) => {
   try {
       const profile = req.body.profile || database.profiles.find(p => p.userId === req.user.id) || {};
       const analysis = req.body.resumeAnalysis || {};
-      const improvement = buildAutoFixForProfile(profile, analysis);
-      return standardResponse(res, true, improvement, 'Auto-fix suggestions generated successfully');
+
+      try {
+        const improvement = await improveResumeWithAI(profile, analysis);
+        return standardResponse(res, true, improvement, 'Resume improved by Sarvam AI');
+      } catch (aiErr) {
+        console.warn('⚠️ Sarvam AI improvement failed, using rule-based fallback:', aiErr.message);
+        const improvement = buildAutoFixForProfile(profile, analysis);
+        return standardResponse(res, true, { ...improvement, aiPowered: false }, 'Resume improved (rule-based fallback)');
+      }
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
   }
 });
 
+// GET /api/profile - Fetch the current user's profile
 app.get('/api/profile', authMiddleware, async (req, res) => {
+  try {
+      const profile = database.profiles.find(p => p.userId === req.user.id) || null;
+      return standardResponse(res, true, profile, 'Profile fetched');
+  } catch (e) {
+      return standardResponse(res, false, null, e.message, 500);
+  }
+});
+
+// POST /api/profile - Create or update the current user's profile
+app.post('/api/profile', authMiddleware, async (req, res) => {
   try {
       let { experience } = req.body;
       
@@ -627,11 +749,13 @@ app.get('/api/profile', authMiddleware, async (req, res) => {
 
       if (profile) {
         Object.assign(profile, updateData);
+        saveDatabase(); // persist update
       } else {
-        profile = createProfile(req.user.id, updateData);
+        profile = createProfile(req.user.id, updateData); // createProfile calls saveDatabase internally
       }
       
-      return standardResponse(res, true, profile, 'Profile updated');
+      console.log(`✅ Profile saved for user: ${req.user.email}`);
+      return standardResponse(res, true, profile, 'Profile saved successfully');
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
   }

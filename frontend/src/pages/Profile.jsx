@@ -807,6 +807,53 @@ export default function Profile() {
                       </CardContent>
                     </Card>
                   )}
+
+                  {suggestions && (
+                    <Card className="rounded-3xl border border-primary/20 bg-primary/5">
+                      <CardHeader className="p-5 flex items-center gap-3">
+                        <Lightbulb className="w-5 h-5 text-primary" />
+                        <CardTitle className="text-lg">AI Suggestions</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5 space-y-5">
+                        {suggestions.whatToImprove?.length > 0 && (
+                          <div>
+                            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground mb-3">What to Improve</p>
+                            <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+                              {suggestions.whatToImprove.map((note, i) => (
+                                <li key={i}>{note}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {suggestions.whatToAdd?.length > 0 && (
+                          <div>
+                            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground mb-3">What to Add</p>
+                            <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+                              {suggestions.whatToAdd.map((note, i) => (
+                                <li key={i}>{note}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {suggestions.recommendedSkills?.length > 0 && (
+                          <div>
+                            <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground mb-3">Recommended Skills</p>
+                            <div className="flex flex-wrap gap-2">
+                              {suggestions.recommendedSkills.map((skill) => (
+                                <Badge key={skill} variant="secondary">{skill}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {suggestions.betterSummary && (
+                          <div className="rounded-2xl bg-background/60 border border-white/10 p-4">
+                            <p className="text-sm uppercase tracking-[0.2em] text-primary mb-2">Suggested Better Summary</p>
+                            <p className="text-sm text-foreground">{suggestions.betterSummary}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
             </CardContent>

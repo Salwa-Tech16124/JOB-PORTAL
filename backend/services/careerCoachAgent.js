@@ -6,7 +6,6 @@
  * and fallback logic for when the API fails.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -22,85 +21,40 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
-// Initialize Gemini API
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-let genAI = null;
-let model = null;
-
-if (GEMINI_API_KEY) {
-  try {
-    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // Try different model names that might be available
-    const modelNames = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
-    for (const modelName of modelNames) {
-      try {
-        model = genAI.getGenerativeModel({ model: modelName });
-        console.log('✅ Gemini API initialized successfully');
-        console.log(`🔑 Using model: ${modelName}`);
-        break;
-      } catch (modelError) {
-        console.log(`⚠️ Model ${modelName} not available, trying next...`);
-        model = null;
-      }
-    }
-  } catch (error) {
-    console.error('❌ Failed to initialize Gemini API:', error.message);
-    model = null;
-  }
-} else {
-  console.warn('⚠️ GEMINI_API_KEY not found in .env file');
-}
-
-// Initialize OpenAI API
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// Initialize Sarvam AI API via OpenAI client
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY || "sk_xs5dbt92_YCfO5S7AF3b9DIQxznmH8tao";
 let openai = null;
 
-if (OPENAI_API_KEY) {
-  try {
-    openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-    console.log('✅ OpenAI API initialized successfully');
-  } catch (error) {
-    console.error('❌ Failed to initialize OpenAI API:', error.message);
-    openai = null;
-  }
-} else {
-  console.warn('⚠️ OPENAI_API_KEY not found in .env file');
+try {
+  openai = new OpenAI({ 
+      apiKey: SARVAM_API_KEY,
+      baseURL: "https://api.sarvam.ai/v1"
+  });
+  console.log('✅ Sarvam AI API initialized successfully');
+} catch (error) {
+  console.error('❌ Failed to initialize Sarvam AI API:', error.message);
+  openai = null;
 }
 
-const getGeminiResponse = async (prompt) => {
-  if (!model) {
-    throw new Error('Gemini API not initialized - GEMINI_API_KEY missing');
-  }
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  
-  if (!text || text.length < 50) {
-    throw new Error('Gemini returned empty or too short response');
-  }
-  
-  return text;
-};
-
 /**
- * Call OpenAI API as fallback
+ * Call Sarvam AI API
  * @param {string} prompt - Formatted prompt
- * @returns {string} - OpenAI response
+ * @returns {string} - Sarvam response
  */
-const getOpenAIResponse = async (prompt) => {
+const getSarvamResponse = async (prompt) => {
   if (!openai) {
-    throw new Error('OpenAI API not initialized - OPENAI_API_KEY missing');
+    throw new Error('Sarvam API not initialized - API Key missing');
   }
 
   const completion = await openai.chat.completions.create({
     messages: [{ role: "system", content: "You are an expert tech career coach." }, { role: "user", content: prompt }],
-    model: "gpt-4o-mini",
+    model: "sarvam-105b",
   });
   
   const text = completion.choices[0].message.content;
   
   if (!text || text.length < 50) {
-    throw new Error('OpenAI returned empty or too short response');
+    throw new Error('Sarvam AI returned empty or too short response');
   }
   
   return text;
@@ -230,7 +184,7 @@ const fallbackResponse = (message, userContext, intent) => {
   const namePrefix = name ? `Hey ${name}! ` : 'Hey there! ';
   const targetRole = goal || 'Professional';
   
-  return `${namePrefix}I am currently experiencing connection issues with my main AI brain (Gemini API), meaning I cannot generate a highly-detailed, personalized roadmap for you at this exact second.
+  return `${namePrefix}I am currently experiencing connection issues with my main AI brain (Sarvam AI), meaning I cannot generate a highly-detailed, personalized roadmap for you at this exact second.
 
 📝 **Your Profile Context Detected:**
 - Target Role: **${targetRole}**
@@ -239,7 +193,7 @@ const fallbackResponse = (message, userContext, intent) => {
 💡 **Temporary Advice:**
 While my AI is offline, I recommend checking out platforms like **roadmap.sh** or browsing **LinkedIn** for real-world professionals in the ${targetRole} field to see what skills they prioritize!
 
-*(Developer Note: The Gemini API is currently throwing 503 Overloaded or 429 Quota Exceeded errors. Please check your Google AI Studio plan or try again later.)*`;
+*(Developer Note: The Sarvam AI API is currently returning an error. Please check your plan or try again later.)*`;
 };
 
 export const getCareerAdvice = async (message, userContext) => {
@@ -268,31 +222,19 @@ export const getCareerAdvice = async (message, userContext) => {
   let aiResponse = null;
   let modelUsed = 'none';
 
-  // AI WATERFALL: Try Gemini -> Try OpenAI -> Fallback
-  
-  // 1. PRIMARY LAYER: Google Gemini
+  // AI LAYER: Sarvam AI
   try {
-    console.log('🚀 [STEP 1] Calling Primary AI (Gemini)...');
-    aiResponse = await getGeminiResponse(prompt);
-    modelUsed = 'gemini';
-    console.log('✅ [STEP 1] Response successfully received from Gemini.');
-  } catch (geminiError) {
-    console.error('❌ [STEP 1] Gemini API Failed or Unavailable:', geminiError.message);
-    
-    // 2. SECONDARY LAYER: OpenAI Fallback
-    try {
-      console.log('🔄 [STEP 2] Failing over to Secondary AI (OpenAI)...');
-      aiResponse = await getOpenAIResponse(prompt);
-      modelUsed = 'openai';
-      console.log('✅ [STEP 2] Response successfully received from OpenAI.');
-    } catch (openAiError) {
-      console.error('❌ [STEP 2] OpenAI API Failed or Unavailable:', openAiError.message);
+    console.log('🚀 [STEP 1] Calling Sarvam AI...');
+    aiResponse = await getSarvamResponse(prompt);
+    modelUsed = 'sarvam-105b';
+    console.log('✅ [STEP 1] Response successfully received from Sarvam AI.');
+  } catch (apiError) {
+    console.error('❌ [STEP 1] Sarvam AI Failed or Unavailable:', apiError.message);
       
-      // 3. TERTIARY LAYER: Hard Fallback
-      console.log('⚠️ [STEP 3] ALL APIs FAILED! Triggering local fallback format...');
-      aiResponse = fallbackResponse(message, builtContext, intent);
-      modelUsed = 'fallback-personalized';
-    }
+    // 2. HARD FALLBACK
+    console.log('⚠️ [STEP 2] API FAILED! Triggering local fallback format...');
+    aiResponse = fallbackResponse(message, builtContext, intent);
+    modelUsed = 'fallback-personalized';
   }
 
   // Format the returned raw content
@@ -316,11 +258,11 @@ export const getCareerAdvice = async (message, userContext) => {
 };
 
 /**
- * Check if Gemini API is available
+ * Check if Sarvam API is available
  * @returns {boolean} - API availability status
  */
 export const isAPIAvailable = () => {
-  return model !== null || openai !== null;
+  return openai !== null;
 };
 
 /**
@@ -329,11 +271,9 @@ export const isAPIAvailable = () => {
  */
 export const getStatus = () => {
   return {
-    geminiAvailable: model !== null,
-    openAiAvailable: openai !== null,
-    model: 'multi-ai',
-    geminiApiKeyConfigured: !!GEMINI_API_KEY,
-    openAiApiKeyConfigured: !!OPENAI_API_KEY
+    sarvamAvailable: openai !== null,
+    model: 'sarvam-105b',
+    sarvamApiKeyConfigured: true
   };
 };
 

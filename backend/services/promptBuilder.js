@@ -5,12 +5,7 @@
  * Forces personalized, non-generic responses based on user context.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-// Initialize Gemini API
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-const model = genAI?.getGenerativeModel({ model: 'gemini-2.5-flash' });
+// Prompt Builder - AI-agnostic. Constructs prompts for Sarvam AI via careerCoachAgent.js
 
 /**
  * Detect user intent from their message
