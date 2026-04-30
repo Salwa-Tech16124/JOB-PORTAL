@@ -39,38 +39,38 @@
 }
 
 .dark {
-  --background: #F9FAFB;
-  --foreground: #111827;
-  --card: #FFFFFF;
-  --card-foreground: #111827;
-  --popover: #FFFFFF;
-  --popover-foreground: #111827;
-  --primary: #F97316;
-  --primary-foreground: #FFFFFF;
-  --secondary: #2563EB;
-  --secondary-foreground: #FFFFFF;
-  --muted: #F9FAFB;
-  --muted-foreground: #6B7280;
-  --accent: #2563EB;
-  --accent-foreground: #FFFFFF;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
-  --border: #E5E7EB;
-  --input: #FFFFFF;
-  --ring: #F97316;
-  --chart-1: #F97316;
-  --chart-2: #2563EB;
-  --chart-3: #FBBF24;
-  --chart-4: #38BDF8;
-  --chart-5: #60A5FA;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #111827;
-  --sidebar-primary: #F97316;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2563EB;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #E5E7EB;
-  --sidebar-ring: #F97316;
+  --background: #020617;
+  --foreground: #f8fafc;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  --primary: #fb923c;
+  --primary-foreground: #020617;
+  --secondary: #3b82f6;
+  --secondary-foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #3b82f6;
+  --accent-foreground: #f8fafc;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: #1e293b;
+  --input: #0f172a;
+  --ring: #fb923c;
+  --chart-1: #fb923c;
+  --chart-2: #3b82f6;
+  --chart-3: #fbbf24;
+  --chart-4: #38bdf8;
+  --chart-5: #60a5fa;
+  --sidebar: #020617;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #fb923c;
+  --sidebar-primary-foreground: #020617;
+  --sidebar-accent: #3b82f6;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #fb923c;
 }
 
 @theme inline {
@@ -131,6 +131,11 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.dark .glass {
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .glass-card {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
@@ -139,8 +144,8 @@
 }
 
 .dark .glass-card {
-  background: rgba(255, 255, 255, 0.90);
-  border: 1px solid rgba(229, 231, 235, 0.8);
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Gradient background */
@@ -149,7 +154,7 @@
 }
 
 .dark .gradient-bg {
-  background: linear-gradient(135deg, #ffffff 0%, #fef3c7 40%, #eff6ff 100%);
+  background: linear-gradient(135deg, #020617 0%, #1e1b4b 40%, #0f172a 100%);
 }
 
 /* Animation utilities */

@@ -2,7 +2,7 @@ import React from 'react';
 import { MapPin, Zap, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-function JobCard({ job, onApply, isApplied }) {
+function JobCard({ job, onApply, isApplied, hideApply }) {
   return (
     <div className="glass-card border border-border rounded-xl p-6 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 group cursor-pointer">
       <div className="flex items-start justify-between mb-4">
@@ -40,17 +40,19 @@ function JobCard({ job, onApply, isApplied }) {
         </div>
       </div>
 
-      <button
-        onClick={() => onApply(job.id)}
-        disabled={isApplied}
-        className={`w-full py-2 rounded-lg font-medium transition-all duration-300 ${
-          isApplied
-            ? 'bg-green-500/10 text-green-500 cursor-default'
-            : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105'
-        }`}
-      >
-        {isApplied ? '✅ Applied' : 'Apply Now'}
-      </button>
+      {!hideApply && (
+        <button
+          onClick={() => onApply(job.id)}
+          disabled={isApplied}
+          className={`w-full py-2 rounded-lg font-medium transition-all duration-300 ${
+            isApplied
+              ? 'bg-green-500/10 text-green-500 cursor-default'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105'
+          }`}
+        >
+          {isApplied ? '✅ Applied' : 'Apply Now'}
+        </button>
+      )}
     </div>
   );
 }

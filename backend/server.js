@@ -20,6 +20,9 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 // Import AI Career Coach Agent
 import { getCareerAdvice as coachProcessMessage, getStatus as getCoachStatus } from './services/careerCoachAgent.js';
 import { analyzeResumeWithAI, getSuggestionsWithAI, improveResumeWithAI } from './services/resumeAgent.js';
+import { generateInterview, evaluateInterview } from './services/interviewAgent.js';
+import { screenCandidate } from './services/resumeScreenerAgent.js';
+import { sendAcceptanceEmail, sendRejectionEmail, sendViewedEmail } from './services/emailService.js';
 
 const app = express();
 
@@ -619,15 +622,179 @@ app.put('/api/applications/:id/status', authMiddleware, async (req, res) => {
       }
     }
     
+    const oldStatus = application.status;
     application.status = status;
     saveDatabase();
+
+    // Notify candidate if status is "Viewed by Company"
+    if (status === 'Viewed by Company' && oldStatus !== 'Viewed by Company') {
+      try {
+        const candidateUser = database.users.find(u => u.id === application.candidateId);
+        const candidateProfile = database.profiles.find(p => p.userId === application.candidateId);
+        
+        if (candidateUser) {
+          sendViewedEmail({
+            to: candidateUser.email,
+            candidateName: candidateProfile?.name || 'Candidate',
+            jobTitle: job.title,
+            companyName: job.company
+          });
+        }
+      } catch (err) {
+        console.error('Failed to send viewed notification:', err.message);
+      }
+    }
+
     return standardResponse(res, true, application, 'Status updated');
   } catch (e) {
     return standardResponse(res, false, null, e.message, 500);
   }
 });
 
-// ── RESUME ANALYZE (Sarvam AI-powered) ──────────────────────────────────────
+// ── AI RESUME SCREENER & EMAIL SENDER ────────────────────────────────────────
+// POST /api/jobs/:id/screen
+// Screens all applicants for a job using Sarvam AI, moves suitable ones to
+// "Interested" status, sends acceptance/rejection emails.
+app.post('/api/jobs/:id/screen', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'employer') {
+      return standardResponse(res, false, null, 'Only employers can screen candidates', 403);
+    }
+
+    const jobId = parseInt(req.params.id);
+    const job = database.jobs.find(j => j.id === jobId);
+    if (!job) return standardResponse(res, false, null, 'Job not found', 404);
+    if (job.employerId !== req.user.id) {
+      return standardResponse(res, false, null, 'You can only screen candidates for your own jobs', 403);
+    }
+
+    // Get employer's profile for company/name info
+    const employerProfile = database.profiles.find(p => p.userId === req.user.id) || {};
+    const employerUser = database.users.find(u => u.id === req.user.id) || {};
+    const companyName = employerProfile.company || job.company || 'Our Company';
+    const employerName = employerProfile.name || employerUser.email || 'The Hiring Team';
+
+    // Get all applications for this job that haven't been screened yet
+    const jobApplications = database.applications.filter(
+      a => a.jobId === jobId && a.status !== 'Interested' && a.status !== 'Screened_Rejected'
+    );
+
+    if (jobApplications.length === 0) {
+      return standardResponse(res, true, { results: [], total: 0 }, 'No new applicants to screen');
+    }
+
+    const results = [];
+
+    for (const application of jobApplications) {
+      // Get candidate profile & user info
+      const candidateUser = database.users.find(u => u.id === application.candidateId) || {};
+      const candidateProfile = database.profiles.find(p => p.userId === application.candidateId) || {};
+
+      const candidateName = candidateProfile.name || candidateUser.email || 'Candidate';
+      // Use profile email first, then user account email
+      const candidateEmail = candidateProfile.email || candidateUser.email || null;
+
+      console.log(`\n🔍 Screening ${candidateName} for "${job.title}"...`);
+
+      // Run AI screening
+      const screening = await screenCandidate({
+        candidateProfile: {
+          name: candidateName,
+          skills: candidateProfile.skills || [],
+          experience: candidateProfile.experience || '',
+          bio: candidateProfile.bio || '',
+          education: candidateProfile.education || ''
+        },
+        jobTitle: job.title,
+        jobDescription: job.description || '',
+        jobSkills: job.skills || []
+      });
+
+      console.log(`📊 Score: ${screening.score} | Suitable: ${screening.suitable} | AI: ${screening.aiPowered}`);
+
+      // Update application status
+      if (screening.suitable) {
+        application.status = 'Interested';
+        application.screeningResult = screening;
+        application.screenedAt = new Date();
+
+        // Send acceptance email
+        const emailResult = await sendAcceptanceEmail({
+          to: candidateEmail,
+          candidateName,
+          jobTitle: job.title,
+          companyName,
+          employerName,
+          strengths: screening.strengths
+        });
+
+        results.push({
+          applicationId: application.id,
+          candidateId: application.candidateId,
+          candidateName,
+          candidateEmail,
+          status: 'Interested',
+          score: screening.score,
+          reason: screening.reason,
+          strengths: screening.strengths,
+          gaps: screening.gaps,
+          emailSent: emailResult.sent,
+          emailPreview: emailResult.previewUrl || null,
+          aiPowered: screening.aiPowered
+        });
+      } else {
+        application.status = 'Screened_Rejected';
+        application.screeningResult = screening;
+        application.screenedAt = new Date();
+
+        // Send rejection email
+        const emailResult = await sendRejectionEmail({
+          to: candidateEmail,
+          candidateName,
+          jobTitle: job.title,
+          companyName,
+          employerName,
+          gaps: screening.gaps
+        });
+
+        results.push({
+          applicationId: application.id,
+          candidateId: application.candidateId,
+          candidateName,
+          candidateEmail,
+          status: 'Screened_Rejected',
+          score: screening.score,
+          reason: screening.reason,
+          strengths: screening.strengths,
+          gaps: screening.gaps,
+          emailSent: emailResult.sent,
+          emailPreview: emailResult.previewUrl || null,
+          aiPowered: screening.aiPowered
+        });
+      }
+    }
+
+    saveDatabase();
+
+    const interested = results.filter(r => r.status === 'Interested').length;
+    const rejected = results.filter(r => r.status === 'Screened_Rejected').length;
+
+    console.log(`\n✅ Screening complete: ${interested} interested, ${rejected} rejected`);
+    return standardResponse(res, true, {
+      results,
+      total: results.length,
+      interested,
+      rejected,
+      jobTitle: job.title
+    }, `Screened ${results.length} candidates: ${interested} interested, ${rejected} not proceeding`);
+
+  } catch (e) {
+    console.error('❌ Screening error:', e);
+    return standardResponse(res, false, null, e.message, 500);
+  }
+});
+
+
 app.post('/api/profile/resume-analyze', authMiddleware, async (req, res) => {
   try {
       const { fileName, fileType, fileData } = req.body;
@@ -734,6 +901,8 @@ app.post('/api/profile', authMiddleware, async (req, res) => {
       const updateData = {
         name: req.body.name ?? profile?.name ?? '',
         role: req.body.role ?? profile?.role ?? req.user.role,
+        title: req.body.title ?? profile?.title ?? '',
+        company: req.body.company ?? profile?.company ?? '',
         bio: req.body.bio ?? profile?.bio ?? '',
         education: req.body.education ?? profile?.education ?? '',
         profilePicture: Object.prototype.hasOwnProperty.call(req.body, 'profilePicture')
@@ -826,21 +995,17 @@ app.post('/api/coach', authMiddleware, async (req, res) => {
 
 app.post('/api/interview', authMiddleware, async (req, res) => {
   try {
-    const aiRes = await fetch('http://127.0.0.1:8000/agent/interview', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
-    });
-    const dataWrapper = await aiRes.json();
-    return standardResponse(res, dataWrapper.success, dataWrapper.data, dataWrapper.message);
+    const { role, level } = req.body;
+    const data = await generateInterview(role, level);
+    return standardResponse(res, true, data, 'Interview questions generated');
   } catch(e) { return standardResponse(res, false, null, e.message, 500); }
 });
 
 app.post('/api/interview/evaluate', authMiddleware, async (req, res) => {
   try {
-    const aiRes = await fetch('http://127.0.0.1:8000/agent/interview/evaluate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
-    });
-    const dataWrapper = await aiRes.json();
-    return standardResponse(res, dataWrapper.success, dataWrapper.data, dataWrapper.message);
+    const { role, level, questions, answers } = req.body;
+    const data = await evaluateInterview(role, level, questions, answers);
+    return standardResponse(res, true, data, 'Interview evaluated');
   } catch(e) { return standardResponse(res, false, null, e.message, 500); }
 });
 

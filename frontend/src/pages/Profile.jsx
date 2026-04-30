@@ -56,8 +56,13 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
-export default function Profile() {
+export default function Profile({ onBack }) {
   const navigate = useNavigate();
+  
+  const handleBack = () => {
+    if (onBack) onBack();
+    else navigate('/dashboard');
+  };
   const toast = useToast();
   const formRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -411,7 +416,7 @@ export default function Profile() {
         >
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={handleBack}
               className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-foreground" />
@@ -571,7 +576,7 @@ export default function Profile() {
             onAddSkill={handleAddSkill}
             onRemoveSkill={handleRemoveSkill}
             onSave={handleSave}
-            onCancel={() => navigate('/dashboard')}
+            onCancel={handleBack}
           />
         </div>
       </div>
@@ -589,7 +594,7 @@ export default function Profile() {
       >
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={handleBack}
             className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />

@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
+import { api } from '../api';
 
 function PostJob() {
   const [title, setTitle] = useState('');
@@ -18,9 +19,6 @@ function PostJob() {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
     // Simple validation - check for fraud keywords
     const fraudKeywords = ['pay upfront', 'send money', 'wire transfer'];
     const hasFraudContent = fraudKeywords.some(keyword => 
@@ -29,9 +27,20 @@ function PostJob() {
     
     if (hasFraudContent) {
       alert(`🚨 AI Fraud Detection:\nYour job posting contains suspicious content and was rejected.\nFlags: ${fraudKeywords.filter(k => description.toLowerCase().includes(k)).join(', ')}`);
-    } else {
-      alert('✅ Job Posted Successfully! Your posting has been approved.');
-      navigate('/');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const res = await api.postJob(title, company, description);
+      if (res.success) {
+        alert('✅ Job Posted Successfully! Your posting has been approved.');
+        navigate('/');
+      } else {
+        alert(`❌ Failed to post job: ${res.message}`);
+      }
+    } catch(err) {
+      alert('❌ Failed to post job. Please try again.');
     }
     
     setLoading(false);

@@ -102,15 +102,15 @@ export const api = {
         const res = await fetch(`${BASE_URL}/interview`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ role, experience_level: level })
+            body: JSON.stringify({ role, level })
         });
         return handleResponse(res);
     },
-    evaluateInterview: async (question, answer) => {
+    evaluateInterview: async (role, level, questions, answers) => {
         const res = await fetch(`${BASE_URL}/interview/evaluate`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ question, answer })
+            body: JSON.stringify({ role, level, questions, answers })
         });
         return handleResponse(res);
     },
@@ -138,6 +138,13 @@ export const api = {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify({ status })
+        });
+        return handleResponse(res);
+    },
+    screenCandidates: async (jobId) => {
+        const res = await fetch(`${BASE_URL}/jobs/${jobId}/screen`, {
+            method: 'POST',
+            headers: getHeaders()
         });
         return handleResponse(res);
     }

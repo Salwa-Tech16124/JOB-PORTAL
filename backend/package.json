@@ -16,6 +16,7 @@
     "mammoth": "^1.12.0",
     "mongodb-memory-server": "^9.3.0",
     "mongoose": "^8.3.4",
+    "nodemailer": "^8.0.7",
     "openai": "^6.34.0",
     "pdf-parse": "^2.4.5"
   },

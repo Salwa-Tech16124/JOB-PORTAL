@@ -24,6 +24,7 @@ function JobBoard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [signupModalOpen, setSignupModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Fetch live jobs and applications from backend
   useEffect(() => {
@@ -32,6 +33,14 @@ function JobBoard() {
       const token = localStorage.getItem('token');
       const isLogged = !!(user && token);
       setIsLoggedIn(isLogged);
+      
+      if (user) {
+        try {
+          setCurrentUser(JSON.parse(user));
+        } catch (e) {
+          console.error(e);
+        }
+      }
 
       try {
         setIsLoading(true);
@@ -307,7 +316,8 @@ function JobBoard() {
           >
         <h1 className="text-4xl font-bold">Job Opportunities</h1>
         <p className="text-muted-foreground text-lg">
-          {filteredJobs.length} {filteredJobs.length === 1 ? 'position' : 'positions'} matching your profile
+          <span className="font-semibold text-primary">{jobs.length}</span> total positions published by employers. 
+          Showing {filteredJobs.length} {filteredJobs.length === 1 ? 'position' : 'positions'} matching your search.
         </p>
       </motion.div>
 
@@ -352,14 +362,16 @@ function JobBoard() {
                       <span className="text-xs text-muted-foreground px-2 py-1">+{(job.skills || []).length - 3}</span>
                     )}
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleApply(job.id)}
-                    variant={applied.has(job.id) ? "outline" : "default"}
-                  >
-                    {applied.has(job.id) ? '✅ Applied' : 'Apply Now'}
-                  </Button>
+                  {(!isLoggedIn || currentUser?.role !== 'employer') && (
+                    <Button 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handleApply(job.id)}
+                      variant={applied.has(job.id) ? "outline" : "default"}
+                    >
+                      {applied.has(job.id) ? '✅ Applied' : 'Apply Now'}
+                    </Button>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -488,6 +500,7 @@ function JobBoard() {
                   job={job} 
                   onApply={() => handleApply(job.id)}
                   isApplied={applied.has(job.id)}
+                  hideApply={isLoggedIn && currentUser?.role === 'employer'}
                 />
               </motion.div>
             ))}

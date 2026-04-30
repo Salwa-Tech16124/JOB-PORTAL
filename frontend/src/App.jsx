@@ -207,15 +207,17 @@ function Layout() {
           <Link to="/" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
             <Briefcase className="w-5 h-5 mr-3" /> Job Board
           </Link>
-          <Link to="/profile" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
-            <User className="w-5 h-5 mr-3" /> AI Profile
-          </Link>
-          <Link to="/coach" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
-            <Compass className="w-5 h-5 mr-3" /> Career Coach
-          </Link>
-          <Link to="/interview" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
-            <Mic className="w-5 h-5 mr-3" /> Interview Prep
-          </Link>
+          {user?.role !== 'employer' && (
+            <>
+              <Link to="/coach" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                <Compass className="w-5 h-5 mr-3" /> Career Coach
+              </Link>
+              <Link to="/interview" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                <Mic className="w-5 h-5 mr-3" /> Interview Prep
+              </Link>
+            </>
+          )}
+
           {user?.role === 'employer' && (
             <div className="pt-4 mt-4 border-t border-[#ffffff10]">
               <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employers</p>
@@ -345,18 +347,8 @@ function Layout() {
                       }}
                       className="w-full text-left px-4 py-3 text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2 font-medium border-t border-border"
                     >
-                      <User className="w-4 h-4" />
-                      View Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setProfileMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-3 text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2 font-medium border-t border-border"
-                    >
                       <Edit className="w-4 h-4" />
-                      Complete Profile
+                      Edit Profile
                     </button>
                     <button
                       onClick={handleLogout}
@@ -399,6 +391,21 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function ProfileRoute() {
+  const navigate = useNavigate();
+  const userStr = localStorage.getItem('user');
+  const userRole = userStr ? JSON.parse(userStr)?.role : null;
+
+  React.useEffect(() => {
+    if (userRole === 'employer') {
+      navigate('/dashboard');
+    }
+  }, [userRole, navigate]);
+
+  if (userRole === 'employer') return null;
+  return <Profile />;
+}
+
 function App() {
   return (
     <ToastProvider>
@@ -410,7 +417,7 @@ function App() {
           {/* Protected Routes - Only if logged in */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile" element={<ProfileRoute />} />
             <Route path="/coach" element={<Coach />} />
             <Route path="/interview" element={<Interview />} />
             <Route path="/post-job" element={<PostJob />} />
