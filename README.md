@@ -93,6 +93,19 @@ PORT=5000
 
 ---
 
+## 📧 Email Testing & Notifications
+
+By default, the system uses **Ethereal Email** for testing. This means no real emails are sent to your inbox, but you can view them online.
+
+- **Viewing Emails**: When an email is triggered (e.g., status update), check the backend console for an Ethereal link (e.g., `https://ethereal.email/message/...`).
+- **Production Setup**: To send real emails, update `backend/.env` with your SMTP credentials:
+  ```env
+  MAIL_USER=your-email@gmail.com
+  MAIL_PASS=your-app-password
+  ```
+
+---
+
 ## 📁 Project Architecture
 
 ```

@@ -173,6 +173,29 @@ function JobBoard() {
           className="flex-1 flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/5 px-4 py-20"
         >
           <div className="text-center max-w-2xl mx-auto space-y-8">
+            {/* Theme Toggle for Landing Page */}
+            <div className="absolute top-6 right-6">
+              <button
+                onClick={() => {
+                  const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                  if (newTheme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                  localStorage.setItem('theme', newTheme);
+                  // Refresh UI if needed
+                  window.dispatchEvent(new Event('themeChanged'));
+                }}
+                className="p-3 bg-card border border-border rounded-xl shadow-sm hover:bg-primary/10 transition-colors text-muted-foreground hover:text-primary"
+                title="Toggle dark mode"
+              >
+                <div className="dark:hidden"><Moon className="w-5 h-5" /></div>
+                <div className="hidden dark:block"><Sun className="w-5 h-5" /></div>
+              </button>
+            </div>
+
             {/* Main Heading */}
             <motion.div
               initial={{ opacity: 0, y: -20 }}

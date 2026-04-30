@@ -540,6 +540,23 @@ app.post('/api/jobs/:id/apply', authMiddleware, async (req, res) => {
       return standardResponse(res, false, null, 'You have already applied to this job', 400);
     }
     
+    // Skill relevance check
+    const candidateProfile = database.profiles.find(p => p.userId === req.user.id) || {};
+    const candidateSkills = (candidateProfile.skills || []).map(s => s.toLowerCase());
+    const jobSkills = (job.skills || []).map(s => s.toLowerCase());
+    
+    // If job has skills, check if candidate has at least one matching skill or related title
+    if (jobSkills.length > 0) {
+      const hasMatch = jobSkills.some(js => 
+        candidateSkills.some(cs => cs.includes(js) || js.includes(cs)) ||
+        (candidateProfile.role && candidateProfile.role.toLowerCase().includes(job.title.toLowerCase()))
+      );
+      
+      if (!hasMatch && jobSkills.length > 2) { // Only block if it's a clear mismatch
+        return standardResponse(res, false, null, `Your profile (${candidateProfile.role || 'Unspecified'}) does not appear to match the requirements for ${job.title}. Please update your skills to apply.`, 400);
+      }
+    }
+    
     const application = createApplication(jobId, req.user.id);
     return standardResponse(res, true, application, 'Application submitted successfully', 201);
   } catch (e) {
@@ -632,13 +649,17 @@ app.put('/api/applications/:id/status', authMiddleware, async (req, res) => {
         const candidateUser = database.users.find(u => u.id === application.candidateId);
         const candidateProfile = database.profiles.find(p => p.userId === application.candidateId);
         
-        if (candidateUser) {
-          sendViewedEmail({
-            to: candidateUser.email,
+        // Use profile email if available, otherwise user account email
+        const targetEmail = candidateProfile?.email || candidateUser?.email;
+        
+        if (targetEmail) {
+          await sendViewedEmail({
+            to: targetEmail,
             candidateName: candidateProfile?.name || 'Candidate',
             jobTitle: job.title,
             companyName: job.company
           });
+          console.log(`📩 Notification: Viewed email sent to ${targetEmail}`);
         }
       } catch (err) {
         console.error('Failed to send viewed notification:', err.message);

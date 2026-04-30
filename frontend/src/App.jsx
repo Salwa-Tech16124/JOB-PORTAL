@@ -20,16 +20,22 @@ function Layout() {
   const [hasNotification, setHasNotification] = useState(true);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  // Load dark mode preference on mount
+  // Load dark mode preference on mount and listen for changes
   React.useEffect(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark') {
-      document.documentElement.classList.add('dark');
-      setTheme('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      setTheme('light');
-    }
+    const syncTheme = () => {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark') {
+        document.documentElement.classList.add('dark');
+        setTheme('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        setTheme('light');
+      }
+    };
+    
+    syncTheme();
+    window.addEventListener('themeChanged', syncTheme);
+    return () => window.removeEventListener('themeChanged', syncTheme);
   }, []);
 
   const toggleTheme = () => {
