@@ -143,8 +143,8 @@ function CareerCoach() {
       console.log('⏰ Timestamp:', new Date().toISOString());
       console.log('='.repeat(80));
 
-      // Call backend endpoint
-      const response = await fetch('http://localhost:5000/api/coach/message', {
+      const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${BASE_URL}/coach/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

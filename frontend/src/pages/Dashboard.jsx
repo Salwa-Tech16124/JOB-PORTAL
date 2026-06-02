@@ -209,7 +209,7 @@ export default function Dashboard() {
                 size="lg"
               >
                 <Edit3 className="w-4 h-4 mr-2" />
-                Complete Your Profile
+                AI Profile Architect
               </Button>
             </CardContent>
           </Card>
@@ -232,8 +232,8 @@ export default function Dashboard() {
                     <Edit3 className="w-6 h-6 text-primary group-hover:text-primary-foreground" />
                   </div>
                   <div className="text-center">
-                    <p className="font-semibold">Update Profile</p>
-                    <p className="text-xs text-muted-foreground group-hover:text-primary-foreground/70">Get started</p>
+                    <p className="font-semibold">AI Profile Architect</p>
+                    <p className="text-xs text-muted-foreground group-hover:text-primary-foreground/70">Optimize your profile</p>
                   </div>
                 </Button>
 
@@ -426,7 +426,7 @@ return (
                   <Edit3 className="w-6 h-6 text-primary group-hover:text-primary-foreground" />
                 </div>
                 <div className="text-center">
-                  <p className="font-semibold">Update Profile</p>
+                  <p className="font-semibold">AI Profile Architect</p>
                   <p className="text-xs text-muted-foreground group-hover:text-primary-foreground/70">Improve your score</p>
                 </div>
               </Button>

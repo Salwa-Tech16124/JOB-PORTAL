@@ -218,6 +218,9 @@ function Layout() {
               <Link to="/coach" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
                 <Compass className="w-5 h-5 mr-3" /> Career Coach
               </Link>
+              <Link to="/profile" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                <User className="w-5 h-5 mr-3" /> AI Profile Architect
+              </Link>
               <Link to="/interview" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
                 <Mic className="w-5 h-5 mr-3" /> Interview Prep
               </Link>
@@ -354,7 +357,7 @@ function Layout() {
                       className="w-full text-left px-4 py-3 text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2 font-medium border-t border-border"
                     >
                       <Edit className="w-4 h-4" />
-                      Edit Profile
+                      AI Profile Architect
                     </button>
                     <button
                       onClick={handleLogout}

@@ -27,12 +27,12 @@ import { sendAcceptanceEmail, sendRejectionEmail, sendViewedEmail } from './serv
 const app = express();
 
 // Initialize Sarvam AI (via OpenAI SDK)
-const SARVAM_API_KEY = process.env.SARVAM_API_KEY || "sk_xs5dbt92_YCfO5S7AF3b9DIQxznmH8tao";
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 const openai = new OpenAI({ 
     apiKey: SARVAM_API_KEY,
     baseURL: "https://api.sarvam.ai/v1"
 });
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb', parameterLimit: 100000 }));
 
@@ -48,145 +48,88 @@ const standardResponse = (res, success, data, message, statusCode = 200) => {
     return res.status(statusCode).json({ success, data, message });
 };
 
-// ============== PERSISTENT FILE DATABASE ==============
-const DB_FILE = path.resolve(__dirname, 'local_db', 'db.json');
+import mongoose from 'mongoose';
 
-// Default state when no saved DB exists
-const DEFAULT_DB = {
-  users: [],
-  profiles: [],
-  applications: [],
-  nextUserId: 1,
-  nextProfileId: 1,
-  nextAppId: 1,
-  nextJobId: 19
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/viva-job-portal')
+  .then(() => console.log('✅ Connected to MongoDB Atlas'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// --- MONGOOSE SCHEMAS ---
+const CounterSchema = new mongoose.Schema({ _id: String, seq: { type: Number, default: 0 } });
+const Counter = mongoose.model('Counter', CounterSchema);
+const getNextSequence = async (name) => {
+  const ret = await Counter.findByIdAndUpdate(name, { $inc: { seq: 1 } }, { new: true, upsert: true });
+  return ret.seq;
 };
 
-// Load database from file or start fresh
-let database;
-try {
-  if (fs.existsSync(DB_FILE)) {
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
-    const saved = JSON.parse(raw);
-    database = { ...DEFAULT_DB, ...saved };
-    console.log(`✅ Database loaded: ${saved.users?.length || 0} users, ${saved.profiles?.length || 0} profiles, ${saved.applications?.length || 0} applications`);
-  } else {
-    database = { ...DEFAULT_DB };
-    console.log('📂 No saved database found, starting fresh.');
-  }
-} catch (err) {
-  console.warn('⚠️ Failed to load DB file, starting fresh:', err.message);
-  database = { ...DEFAULT_DB };
-}
+const UserSchema = new mongoose.Schema({
+  id: { type: Number, unique: true },
+  email: { type: String, unique: true },
+  password: { type: String },
+  role: { type: String },
+  createdAt: { type: Date, default: Date.now }
+});
+const User = mongoose.model('User', UserSchema);
 
-// Mock jobs always seeded fresh (not persisted)
-const MOCK_JOBS = [
-  { id: 1, title: 'Senior React Developer', company: 'TechCorp Inc', location: 'San Francisco, CA', salary: '$150k - $200k', skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'], match: 95, type: 'tech', description: 'Build scalable web applications with React and TypeScript', employerId: null },
-  { id: 2, title: 'Full Stack Engineer', company: 'StartupXYZ', location: 'Remote', salary: '$120k - $160k', skills: ['JavaScript', 'React', 'Python', 'AWS'], match: 88, type: 'tech', description: 'Lead frontend and backend development for our platform', employerId: null },
-  { id: 3, title: 'Backend Developer', company: 'CloudSys Ltd', location: 'New York, NY', salary: '$130k - $170k', skills: ['Node.js', 'PostgreSQL', 'Docker', 'Kubernetes'], match: 82, type: 'tech', description: 'Design and maintain scalable backend systems', employerId: null },
-  { id: 4, title: 'DevOps Engineer', company: 'InfraCloud', location: 'Seattle, WA', salary: '$140k - $180k', skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD'], match: 78, type: 'tech', description: 'Optimize deployment pipelines and infrastructure', employerId: null },
-  { id: 5, title: 'Data Engineer', company: 'DataMind', location: 'Boston, MA', salary: '$135k - $175k', skills: ['Python', 'SQL', 'Apache Spark', 'AWS'], match: 72, type: 'tech', description: 'Build data pipelines and analytics solutions', employerId: null },
-  { id: 6, title: 'Frontend Specialist', company: 'DesignStudio', location: 'Austin, TX', salary: '$110k - $150k', skills: ['React', 'Tailwind', 'Figma', 'JavaScript'], match: 92, type: 'tech', description: 'Create beautiful and responsive user interfaces', employerId: null },
-  { id: 7, title: 'ML Engineer', company: 'AI Labs', location: 'San Jose, CA', salary: '$160k - $210k', skills: ['Python', 'TensorFlow', 'PyTorch', 'Data Science'], match: 68, type: 'tech', description: 'Develop machine learning models and solutions', employerId: null },
-  { id: 8, title: 'Solutions Architect', company: 'Enterprise Co', location: 'Chicago, IL', salary: '$145k - $185k', skills: ['AWS', 'Azure', 'System Design', 'Leadership'], match: 75, type: 'tech', description: 'Design enterprise-scale solutions for clients', employerId: null },
-  { id: 9, title: 'Backend Software Engineer', company: 'CodeNest', location: 'Remote', salary: '$125k - $165k', skills: ['Node.js', 'Express', 'MongoDB', 'AWS'], match: 84, type: 'tech', description: 'Build resilient backend services and APIs for fast-growing products', employerId: null },
-  { id: 10, title: 'Frontend Developer', company: 'PixelWave', location: 'San Diego, CA', salary: '$115k - $155k', skills: ['React', 'Next.js', 'CSS', 'GraphQL'], match: 90, type: 'tech', description: 'Craft responsive user interfaces with modern frontend frameworks', employerId: null },
-  { id: 11, title: 'Full Stack Developer', company: 'VelocityTech', location: 'Austin, TX', salary: '$125k - $170k', skills: ['React', 'Node.js', 'PostgreSQL', 'Docker'], match: 87, type: 'tech', description: 'Implement end-to-end features across frontend and backend services', employerId: null },
-  { id: 12, title: 'Data Engineer II', company: 'InsightWorks', location: 'Seattle, WA', salary: '$138k - $178k', skills: ['Python', 'Airflow', 'BigQuery', 'ETL'], match: 79, type: 'tech', description: 'Build and maintain analytics pipelines for large-scale data platforms', employerId: null },
-  { id: 13, title: 'ML Research Engineer', company: 'DeepLogic', location: 'Palo Alto, CA', salary: '$165k - $215k', skills: ['Python', 'PyTorch', 'NLP', 'Model Deployment'], match: 70, type: 'tech', description: 'Research and deploy machine learning models for real-world applications', employerId: null },
-  { id: 14, title: 'Cloud Infrastructure Engineer', company: 'NimbusOps', location: 'Denver, CO', salary: '$145k - $185k', skills: ['AWS', 'Terraform', 'Kubernetes', 'CI/CD'], match: 76, type: 'tech', description: 'Design cloud infrastructure and automation for scalable services', employerId: null },
-  { id: 15, title: 'HR Manager', company: 'PeopleFirst', location: 'Chicago, IL', salary: '$85k - $105k', skills: ['Recruiting', 'Employee Relations', 'HRIS', 'Compliance'], match: 65, type: 'non-tech', description: 'Manage talent acquisition, employee engagement, and HR operations', employerId: null },
-  { id: 16, title: 'Marketing Executive', company: 'GrowthPulse', location: 'New York, NY', salary: '$70k - $90k', skills: ['Content Strategy', 'SEO', 'Campaign Management', 'Analytics'], match: 60, type: 'non-tech', description: 'Execute multi-channel marketing campaigns and drive brand growth', employerId: null },
-  { id: 17, title: 'Sales Executive', company: 'RevenueRise', location: 'Boston, MA', salary: '$75k - $95k', skills: ['B2B Sales', 'CRM', 'Negotiation', 'Lead Generation'], match: 62, type: 'non-tech', description: 'Build relationships and close sales opportunities for enterprise clients', employerId: null },
-  { id: 18, title: 'Business Analyst', company: 'StrategyWorks', location: 'Remote', salary: '$80k - $100k', skills: ['Data Analysis', 'Stakeholder Management', 'SQL', 'Process Improvement'], match: 68, type: 'non-tech', description: 'Translate business needs into actionable requirements and insights', employerId: null }
-];
+const ProfileSchema = new mongoose.Schema({
+  id: { type: Number, unique: true },
+  userId: { type: Number, unique: true },
+  name: String, role: String, title: String, company: String, bio: String,
+  education: String, profilePicture: String, skills: [String], experience: String,
+  email: String, createdAt: { type: Date, default: Date.now }
+});
+const Profile = mongoose.model('Profile', ProfileSchema);
 
-// Merge mock jobs with any employer-posted jobs saved to disk
-const savedEmployerJobs = (database.jobs || []).filter(j => j.employerId !== null);
-database.jobs = [...MOCK_JOBS, ...savedEmployerJobs];
+const JobSchema = new mongoose.Schema({
+  id: { type: Number, unique: true },
+  title: String, company: String, description: String, employerId: Number,
+  location: String, salary: String, skills: [String], match: Number, type: String,
+  createdAt: { type: Date, default: Date.now }
+});
+const Job = mongoose.model('Job', JobSchema);
 
-// Save database to file (debounced — max once per 500ms)
-let saveTimer = null;
-const saveDatabase = () => {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      const toSave = {
-        users: database.users,
-        profiles: database.profiles,
-        applications: database.applications,
-        jobs: database.jobs.filter(j => j.employerId !== null), // only employer-posted jobs
-        nextUserId: database.nextUserId,
-        nextProfileId: database.nextProfileId,
-        nextAppId: database.nextAppId,
-        nextJobId: database.nextJobId
-      };
-      fs.writeFileSync(DB_FILE, JSON.stringify(toSave, null, 2), 'utf8');
-    } catch (err) {
-      console.error('❌ Failed to save database:', err.message);
-    }
-  }, 500);
-};
-
-const ROLE_SKILL_MAP = {
-  'Software Engineer': ['JavaScript', 'TypeScript', 'Node.js', 'React', 'APIs', 'Git'],
-  'Frontend Developer': ['JavaScript', 'React', 'HTML', 'CSS', 'TypeScript', 'Responsive Design'],
-  'Backend Developer': ['Node.js', 'APIs', 'Databases', 'Authentication', 'Express', 'Docker'],
-  'Full Stack Developer': ['React', 'Node.js', 'APIs', 'SQL', 'DevOps', 'Testing'],
-  'Mobile App Developer': ['React Native', 'Swift', 'Kotlin', 'Mobile UI', 'APIs', 'Debugging'],
-  'Data Scientist': ['Python', 'SQL', 'Machine Learning', 'Statistics', 'Pandas', 'Visualization'],
-  'Data Analyst': ['SQL', 'Excel', 'Tableau', 'Power BI', 'Data Cleaning', 'Reporting'],
-  'Product Manager': ['Roadmaps', 'Stakeholder Management', 'User Research', 'Prioritization', 'Metrics'],
-  'UX/UI Designer': ['Figma', 'Wireframing', 'Prototyping', 'Accessibility', 'User Testing', 'Design Systems'],
-  'DevOps Engineer': ['CI/CD', 'Docker', 'Kubernetes', 'AWS', 'Monitoring', 'Infrastructure'],
-  'QA/Test Engineer': ['Automation', 'Test Plans', 'Scripting', 'Regression Testing', 'CI', 'Bug Tracking'],
-  'Business Analyst': ['Requirements Gathering', 'Process Mapping', 'Stakeholder Alignment', 'UAT', 'Reporting'],
-  'Project Manager': ['Planning', 'Risk Management', 'Communication', 'Scrum', 'Budgeting', 'Delivery'],
-  'Machine Learning Engineer': ['Python', 'TensorFlow', 'PyTorch', 'Model Deployment', 'Data Pipelines', 'ML Ops']
-};
+const ApplicationSchema = new mongoose.Schema({
+  id: { type: Number, unique: true },
+  jobId: Number, candidateId: Number, status: String,
+  appliedAt: { type: Date, default: Date.now },
+  screeningResult: Object, screenedAt: Date
+});
+const Application = mongoose.model('Application', ApplicationSchema);
 
 // Database helper functions
-const findUserByEmail = (email) => database.users.find(u => u.email === email);
-const findUserById = (id) => database.users.find(u => u.id === id);
 
-const createUser = (email, hashedPassword, role) => {
-  const user = { id: database.nextUserId++, email, password: hashedPassword, role, createdAt: new Date() };
-  database.users.push(user);
-  saveDatabase();
+const findUserByEmail = async (email) => await User.findOne({ email });
+const findUserById = async (id) => await User.findOne({ id });
+
+const createUser = async (email, hashedPassword, role) => {
+  const id = await getNextSequence('userId');
+  const user = new User({ id, email, password: hashedPassword, role });
+  await user.save();
   return user;
 };
 
-const createProfile = (userId, data) => {
-  const profile = { id: database.nextProfileId++, userId, ...data, createdAt: new Date() };
-  database.profiles.push(profile);
-  saveDatabase();
+const createProfile = async (userId, data) => {
+  const id = await getNextSequence('profileId');
+  const profile = new Profile({ id, userId, ...data });
+  await profile.save();
   return profile;
 };
 
-const createJob = (title, company, description, employerId, location = 'Remote', salary = 'Not Specified', skills = []) => {
-  const job = {
-    id: database.nextJobId++,
-    title, company, description, employerId, location, salary, skills,
-    createdAt: new Date(),
-    match: Math.floor(Math.random() * 40) + 60
-  };
-  database.jobs.push(job);
-  saveDatabase();
+const createJob = async (title, company, description, employerId, location = 'Remote', salary = 'Not Specified', skills = []) => {
+  const id = await getNextSequence('jobId');
+  const job = new Job({ id, title, company, description, employerId, location, salary, skills, match: Math.floor(Math.random() * 40) + 60 });
+  await job.save();
   return job;
 };
 
-const createApplication = (jobId, candidateId) => {
-  const application = {
-    id: database.nextAppId++,
-    jobId: parseInt(jobId),
-    candidateId,
-    status: 'Applied',
-    appliedAt: new Date()
-  };
-  database.applications.push(application);
-  saveDatabase();
+const createApplication = async (jobId, candidateId) => {
+  const id = await getNextSequence('appId');
+  const application = new Application({ id, jobId, candidateId, status: 'Applied' });
+  await application.save();
   return application;
 };
+
 
 const normalizeResumeText = (rawText) => {
   if (!rawText) return '';
@@ -404,7 +347,7 @@ const buildAutoFixForProfile = (profile = {}, analysis = {}) => {
 console.log('✅ Connected to In-Memory Database for Local Development');
 
 // ============== MIDDLEWARE ==============
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return standardResponse(res, false, null, 'Unauthorized', 401);
@@ -413,7 +356,7 @@ const authMiddleware = (req, res, next) => {
     
     // Explicitly check that this user still exists in the in-memory array 
     // to prevent orphaned browser tokens surviving a server restart from bypassing auth
-    const user = findUserById(decoded.id);
+    const user = await findUserById(decoded.id);
     if (!user) {
         return standardResponse(res, false, null, 'User session expired or database reset', 401);
     }
@@ -430,11 +373,11 @@ const authMiddleware = (req, res, next) => {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password, role } = req.body;
-    if (findUserByEmail(email)) {
+    if (await findUserByEmail(email)) {
       return standardResponse(res, false, null, 'Email already exists', 400);
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = createUser(email, hashedPassword, role);
+    const user = await createUser(email, hashedPassword, role);
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     console.log(`✅ User registered: ${email} (${role})`);
     return standardResponse(res, true, { token, user: { id: user.id, email: user.email, role: user.role } }, 'User registered', 201);
@@ -447,7 +390,7 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = findUserByEmail(email);
+    const user = await findUserByEmail(email);
     if (!user || !(await bcrypt.compare(password, user.password))) {
       console.log(`⚠️ Failed login attempt for: ${email}`);
       return standardResponse(res, false, null, 'Invalid credentials', 401);
@@ -464,7 +407,7 @@ app.post('/api/auth/login', async (req, res) => {
 // ============== JOB APIs ==============
 app.get('/api/jobs', async (req, res) => {
   try {
-      return standardResponse(res, true, database.jobs, 'Jobs fetched');
+      return standardResponse(res, true, await Job.find({}), 'Jobs fetched');
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
   }
@@ -476,7 +419,7 @@ app.post('/api/jobs', authMiddleware, async (req, res) => {
 
       // 1. AI Fraud Detection
       try {
-        const aiRes = await fetch('http://127.0.0.1:8000/agent/fraud-detection', {
+        const aiRes = await fetch(`${process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000'}/agent/fraud-detection`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: req.body.title || '', description: req.body.description || '' })
@@ -491,7 +434,7 @@ app.post('/api/jobs', authMiddleware, async (req, res) => {
         console.error('AI Service down:', e);
       }
 
-      const job = createJob(req.body.title, req.body.company, req.body.description, req.user.id);
+      const job = await createJob(req.body.title, req.body.company, req.body.description, req.user.id);
       return standardResponse(res, true, job, 'Job created', 201);
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
@@ -500,14 +443,14 @@ app.post('/api/jobs', authMiddleware, async (req, res) => {
 
 app.get('/api/jobs/:id/match', authMiddleware, async (req, res) => {
   try {
-    const job = database.jobs.find(j => j.id == req.params.id);
-    const profile = database.profiles.find(p => p.userId === req.user.id);
+    const job = await Job.find({}).find(j => j.id == req.params.id);
+    const profile = await Profile.findOne({ userId: req.user.id });
     
     if (!profile || !profile.skills || profile.skills.length === 0) {
        return standardResponse(res, false, null, 'Please complete your profile first', 400);
     }
 
-    const aiRes = await fetch('http://127.0.0.1:8000/agent/match', {
+    const aiRes = await fetch(`${process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000'}/agent/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_skills: profile.skills, job_description: job.description })
@@ -528,20 +471,20 @@ app.post('/api/jobs/:id/apply', authMiddleware, async (req, res) => {
     }
     
     const jobId = parseInt(req.params.id);
-    const job = database.jobs.find(j => j.id === jobId);
+    const job = await Job.find({}).find(j => j.id === jobId);
     
     if (!job) {
       return standardResponse(res, false, null, 'Job not found', 404);
     }
     
     // Check if already applied
-    const existing = database.applications.find(a => a.jobId === jobId && a.candidateId === req.user.id);
+    const existing = await Application.findOne({ jobId: jobId, candidateId: req.user.id });
     if (existing) {
       return standardResponse(res, false, null, 'You have already applied to this job', 400);
     }
     
     // Skill relevance check
-    const candidateProfile = database.profiles.find(p => p.userId === req.user.id) || {};
+    const candidateProfile = await Profile.findOne({ userId: req.user.id }) || {};
     const candidateSkills = (candidateProfile.skills || []).map(s => s.toLowerCase());
     const jobSkills = (job.skills || []).map(s => s.toLowerCase());
     
@@ -557,7 +500,7 @@ app.post('/api/jobs/:id/apply', authMiddleware, async (req, res) => {
       }
     }
     
-    const application = createApplication(jobId, req.user.id);
+    const application = await createApplication(jobId, req.user.id);
     return standardResponse(res, true, application, 'Application submitted successfully', 201);
   } catch (e) {
     return standardResponse(res, false, null, e.message, 500);
@@ -568,31 +511,31 @@ app.get('/api/applications', authMiddleware, async (req, res) => {
   try {
     if (req.user.role === 'candidate') {
       // Return applications for this candidate
-      const candidateApps = database.applications.filter(a => a.candidateId === req.user.id);
+      const candidateApps = await Application.find({ candidateId: req.user.id }).lean();
       
       // Inflate with job details
-      const populatedApps = candidateApps.map(app => {
-        const jobInfo = database.jobs.find(j => j.id === app.jobId);
+      const populatedApps = await Promise.all(candidateApps.map(async app => {
+        const jobInfo = await Job.findOne({ id: app.jobId }).lean();
         return {
           ...app,
           job: jobInfo || null
         };
-      });
+      }));
       return standardResponse(res, true, populatedApps, 'Candidate applications fetched');
     } 
     else if (req.user.role === 'employer') {
       // Find all jobs posted by this employer
-      const employerJobs = database.jobs.filter(j => j.employerId === req.user.id);
+      const employerJobs = await Job.find({ employerId: req.user.id }).lean();
       const employerJobIds = employerJobs.map(j => j.id);
       
       // Find applications for those jobs
-      const employerApps = database.applications.filter(a => employerJobIds.includes(a.jobId));
+      const employerApps = await Application.find({ jobId: { $in: employerJobIds } }).lean();
       
       // Inflate with candidate profiles and job titles
-      const populatedApps = employerApps.map(app => {
-        const candidateProfile = database.profiles.find(p => p.userId === app.candidateId) || {};
-        const candidateUser = database.users.find(u => u.id === app.candidateId) || {};
-        const jobInfo = database.jobs.find(j => j.id === app.jobId) || {};
+      const populatedApps = await Promise.all(employerApps.map(async app => {
+        const candidateProfile = await Profile.findOne({ userId: app.candidateId }).lean() || {};
+        const candidateUser = await User.findOne({ id: app.candidateId }).lean() || {};
+        const jobInfo = await Job.findOne({ id: app.jobId }).lean() || {};
         
         return {
           ...app,
@@ -605,7 +548,7 @@ app.get('/api/applications', authMiddleware, async (req, res) => {
             experience: candidateProfile.experience || ''
           }
         };
-      });
+      }));
       
       return standardResponse(res, true, populatedApps, 'Employer applications fetched');
     }
@@ -623,14 +566,14 @@ app.put('/api/applications/:id/status', authMiddleware, async (req, res) => {
     
     const { status } = req.body;
     const appId = parseInt(req.params.id);
-    const application = database.applications.find(a => a.id === appId);
+    const application = await Application.findOne({ id: appId });
     
     if (!application) {
       return standardResponse(res, false, null, 'Application not found', 404);
     }
     
     // Verify employer owns the job
-    const job = database.jobs.find(j => j.id === application.jobId);
+    const job = await Job.find({}).find(j => j.id === application.jobId);
     if (!job || job.employerId !== req.user.id) {
       if (job && job.employerId === null) {
         // Mock jobs have employerId null, allow testing
@@ -641,13 +584,12 @@ app.put('/api/applications/:id/status', authMiddleware, async (req, res) => {
     
     const oldStatus = application.status;
     application.status = status;
-    saveDatabase();
 
     // Notify candidate if status is "Viewed by Company"
     if (status === 'Viewed by Company' && oldStatus !== 'Viewed by Company') {
       try {
-        const candidateUser = database.users.find(u => u.id === application.candidateId);
-        const candidateProfile = database.profiles.find(p => p.userId === application.candidateId);
+        const candidateUser = await User.findOne({ id: application.candidateId });
+        const candidateProfile = await Profile.findOne({ userId: application.candidateId });
         
         // Use profile email if available, otherwise user account email
         const targetEmail = candidateProfile?.email || candidateUser?.email;
@@ -683,22 +625,20 @@ app.post('/api/jobs/:id/screen', authMiddleware, async (req, res) => {
     }
 
     const jobId = parseInt(req.params.id);
-    const job = database.jobs.find(j => j.id === jobId);
+    const job = await Job.find({}).find(j => j.id === jobId);
     if (!job) return standardResponse(res, false, null, 'Job not found', 404);
     if (job.employerId !== req.user.id) {
       return standardResponse(res, false, null, 'You can only screen candidates for your own jobs', 403);
     }
 
     // Get employer's profile for company/name info
-    const employerProfile = database.profiles.find(p => p.userId === req.user.id) || {};
-    const employerUser = database.users.find(u => u.id === req.user.id) || {};
+    const employerProfile = await Profile.findOne({ userId: req.user.id }) || {};
+    const employerUser = await User.findOne({ id: req.user.id }) || {};
     const companyName = employerProfile.company || job.company || 'Our Company';
     const employerName = employerProfile.name || employerUser.email || 'The Hiring Team';
 
     // Get all applications for this job that haven't been screened yet
-    const jobApplications = database.applications.filter(
-      a => a.jobId === jobId && a.status !== 'Interested' && a.status !== 'Screened_Rejected'
-    );
+    const jobApplications = await Application.find({ jobId: jobId, status: { $nin: ['Interested', 'Screened_Rejected'] } });
 
     if (jobApplications.length === 0) {
       return standardResponse(res, true, { results: [], total: 0 }, 'No new applicants to screen');
@@ -738,6 +678,7 @@ app.post('/api/jobs/:id/screen', authMiddleware, async (req, res) => {
         application.status = 'Interested';
         application.screeningResult = screening;
         application.screenedAt = new Date();
+        await application.save();
 
         // Send acceptance email
         const emailResult = await sendAcceptanceEmail({
@@ -767,6 +708,7 @@ app.post('/api/jobs/:id/screen', authMiddleware, async (req, res) => {
         application.status = 'Screened_Rejected';
         application.screeningResult = screening;
         application.screenedAt = new Date();
+        await application.save();
 
         // Send rejection email
         const emailResult = await sendRejectionEmail({
@@ -794,8 +736,6 @@ app.post('/api/jobs/:id/screen', authMiddleware, async (req, res) => {
         });
       }
     }
-
-    saveDatabase();
 
     const interested = results.filter(r => r.status === 'Interested').length;
     const rejected = results.filter(r => r.status === 'Screened_Rejected').length;
@@ -827,7 +767,7 @@ app.post('/api/profile/resume-analyze', authMiddleware, async (req, res) => {
       const rawText = await extractResumeText(fileName, fileType, fileData);
       console.log(`📝 Resume text preview (first 200 chars): ${rawText.slice(0, 200)}`);
 
-      const profile = database.profiles.find(p => p.userId === req.user.id) || {};
+      const profile = await Profile.findOne({ userId: req.user.id }) || {};
 
       try {
         const analysis = await analyzeResumeWithAI(
@@ -887,7 +827,7 @@ app.post('/api/profile/improve', authMiddleware, async (req, res) => {
 // GET /api/profile - Fetch the current user's profile
 app.get('/api/profile', authMiddleware, async (req, res) => {
   try {
-      const profile = database.profiles.find(p => p.userId === req.user.id) || null;
+      const profile = await Profile.findOne({ userId: req.user.id }) || null;
       return standardResponse(res, true, profile, 'Profile fetched');
   } catch (e) {
       return standardResponse(res, false, null, e.message, 500);
@@ -902,7 +842,7 @@ app.post('/api/profile', authMiddleware, async (req, res) => {
       let aiData = {};
       if (experience) {
         try {
-          const aiRes = await fetch('http://127.0.0.1:8000/agent/profile', {
+          const aiRes = await fetch(`${process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000'}/agent/profile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: experience })
@@ -916,7 +856,7 @@ app.post('/api/profile', authMiddleware, async (req, res) => {
         }
       }
 
-      let profile = database.profiles.find(p => p.userId === req.user.id);
+      let profile = await Profile.findOne({ userId: req.user.id });
       const incomingSkills = Array.isArray(req.body.skills) ? req.body.skills : undefined;
       const hasExperienceField = Object.prototype.hasOwnProperty.call(req.body, 'experience');
       const updateData = {
@@ -938,10 +878,9 @@ app.post('/api/profile', authMiddleware, async (req, res) => {
       };
 
       if (profile) {
-        Object.assign(profile, updateData);
-        saveDatabase(); // persist update
+        Object.assign(profile, updateData); // persist update
       } else {
-        profile = createProfile(req.user.id, updateData); // createProfile calls saveDatabase internally
+        profile = await createProfile(req.user.id, updateData); // createProfile calls saveDatabase internally
       }
       
       console.log(`✅ Profile saved for user: ${req.user.email}`);
@@ -1006,7 +945,7 @@ app.get('/api/coach/status', (req, res) => {
 
 app.post('/api/coach', authMiddleware, async (req, res) => {
   try {
-    const aiRes = await fetch('http://127.0.0.1:8000/agent/career-coach', {
+    const aiRes = await fetch(`${process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000'}/agent/career-coach`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
     });
     const dataWrapper = await aiRes.json();

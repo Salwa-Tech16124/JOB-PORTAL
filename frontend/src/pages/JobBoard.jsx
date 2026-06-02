@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Filter, TrendingUp, ChevronRight, AlertCircle, ArrowRight, CheckCircle } from 'lucide-react';
+import { Search, Filter, TrendingUp, ChevronRight, AlertCircle, ArrowRight, CheckCircle, Moon, Sun } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
