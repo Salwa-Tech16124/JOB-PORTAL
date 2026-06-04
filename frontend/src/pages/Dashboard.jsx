@@ -238,7 +238,7 @@ export default function Dashboard() {
                 </Button>
 
                 <Button
-                  onClick={() => handleNavigate('/')}
+                  onClick={() => handleNavigate('/jobs')}
                   variant="outline"
                   className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-chart-3 hover:text-white group transition-all duration-300 cursor-pointer hover:scale-105"
                 >
@@ -448,7 +448,7 @@ return (
               )}
 
               <Button
-                onClick={() => handleNavigate('/')}
+                onClick={() => handleNavigate('/jobs')}
                 variant="outline"
                 className="h-auto py-6 flex flex-col items-center gap-3 bg-secondary/30 border-0 hover:bg-chart-3 hover:text-white group transition-all duration-300 cursor-pointer hover:scale-105"
               >

@@ -35,7 +35,7 @@ function PostJob() {
       const res = await api.postJob(title, company, description);
       if (res.success) {
         alert('✅ Job Posted Successfully! Your posting has been approved.');
-        navigate('/');
+        navigate('/jobs');
       } else {
         alert(`❌ Failed to post job: ${res.message}`);
       }

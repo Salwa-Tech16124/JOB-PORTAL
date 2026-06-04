@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Outlet } from 'react-router-dom';
-import { Briefcase, User, Compass, Mic, PlusCircle, LogOut, Menu, LayoutGrid, Search, Moon, Sun, Bell, ChevronDown, Edit, Image as ImageIcon } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Outlet, Navigate } from 'react-router-dom';
+import { Briefcase, User, Compass, Mic, PlusCircle, LogOut, Menu, LayoutGrid, Search, Moon, Sun, Bell, ChevronDown, Edit, Image as ImageIcon, X } from 'lucide-react';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { api } from './api';
 import { Avatar, AvatarFallback, AvatarImage } from './components/ui/avatar';
@@ -19,6 +19,7 @@ function Layout() {
   const [searchQuery, setSearchQuery] = useState('');
   const [hasNotification, setHasNotification] = useState(true);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Load dark mode preference on mount and listen for changes
   React.useEffect(() => {
@@ -62,9 +63,9 @@ function Layout() {
   const handleSearch = () => {
     const query = searchQuery.trim();
     if (query) {
-      navigate(`/?q=${encodeURIComponent(query)}`);
+      navigate(`/jobs?q=${encodeURIComponent(query)}`);
     } else {
-      navigate('/');
+      navigate('/jobs');
     }
   };
 
@@ -210,7 +211,7 @@ function Layout() {
           <Link to="/dashboard" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
             <LayoutGrid className="w-5 h-5 mr-3" /> Dashboard
           </Link>
-          <Link to="/" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+          <Link to="/jobs" className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
             <Briefcase className="w-5 h-5 mr-3" /> Job Board
           </Link>
           {user?.role !== 'employer' && (
@@ -238,13 +239,66 @@ function Layout() {
         </nav>
       </aside>
 
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
+          <aside 
+            className="w-64 h-full bg-card border-r border-border flex flex-col shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-16 flex items-center justify-between px-6 border-b border-border">
+              <div className="flex items-center gap-2">
+                <img src="/logo.png" alt="JobPortal Logo" className="h-8 w-auto object-contain" />
+                <span className="font-semibold text-lg text-foreground">JobPortal</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)}>
+                <X className="w-6 h-6 text-muted-foreground" />
+              </button>
+            </div>
+            
+            <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
+              <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                <LayoutGrid className="w-5 h-5 mr-3" /> Dashboard
+              </Link>
+              <Link to="/jobs" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                <Briefcase className="w-5 h-5 mr-3" /> Job Board
+              </Link>
+              {user?.role !== 'employer' && (
+                <>
+                  <Link to="/coach" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                    <Compass className="w-5 h-5 mr-3" /> Career Coach
+                  </Link>
+                  <Link to="/profile" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                    <User className="w-5 h-5 mr-3" /> AI Profile Architect
+                  </Link>
+                  <Link to="/interview" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-colors font-medium">
+                    <Mic className="w-5 h-5 mr-3" /> Interview Prep
+                  </Link>
+                </>
+              )}
+
+              {user?.role === 'employer' && (
+                <div className="pt-4 mt-4 border-t border-border">
+                  <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employers</p>
+                  <Link to="/post-job" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3 text-muted-foreground hover:bg-secondary/10 hover:text-secondary rounded-xl transition-colors font-medium">
+                    <PlusCircle className="w-5 h-5 mr-3" /> Post Job
+                  </Link>
+                </div>
+              )}
+            </nav>
+          </aside>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Top Navbar */}
         <header className="h-16 glass border-b border-border flex items-center justify-between px-6 z-30 sticky top-0 shadow-sm">
           {/* Left: Mobile Menu */}
           <div className="flex items-center gap-2 md:hidden">
-            <Menu className="w-6 h-6 text-foreground" />
+            <button onClick={() => setMobileMenuOpen(true)}>
+              <Menu className="w-6 h-6 text-foreground" />
+            </button>
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="JobPortal Logo" className="h-8 w-auto object-contain" />
               <span className="font-semibold text-lg text-foreground">JobPortal</span>
@@ -415,16 +469,23 @@ function ProfileRoute() {
   return <Profile />;
 }
 
+function HomeRoute() {
+  const token = localStorage.getItem('token');
+  if (token) return <Navigate to="/dashboard" replace />;
+  return <JobBoard />;
+}
+
 function App() {
   return (
     <ToastProvider>
       <Router>
         <Routes>
           {/* Landing Page - Accessible to all */}
-          <Route path="/" element={<JobBoard />} />
+          <Route path="/" element={<HomeRoute />} />
 
           {/* Protected Routes - Only if logged in */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route path="/jobs" element={<JobBoard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<ProfileRoute />} />
             <Route path="/coach" element={<Coach />} />
