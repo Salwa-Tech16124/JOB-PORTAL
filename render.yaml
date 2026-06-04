@@ -3,6 +3,7 @@ services:
   - type: web
     name: viva-ai-service
     env: python
+    plan: free
     rootDir: ai-service
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -14,6 +15,7 @@ services:
   - type: web
     name: viva-backend
     env: node
+    plan: free
     rootDir: backend
     buildCommand: npm install
     startCommand: node server.js
@@ -29,17 +31,6 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: FRONTEND_URL
-        value: https://viva-job-portal.onrender.com
+        value: https://job-portal-teal-eight-25.vercel.app
       - key: AI_SERVICE_URL
         value: https://viva-ai-service.onrender.com
-
-  # 3. Frontend Service (React + Vite Static Site)
-  - type: web
-    name: viva-job-portal
-    env: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_URL
-        value: https://viva-backend.onrender.com/api
