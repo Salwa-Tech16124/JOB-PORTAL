@@ -14,6 +14,7 @@
 ---
 
 ## 🌟 Overview
+frontend live demo link- https://job-portal-teal-eight-25.vercel.app/
 
 **VIVA** is a state-of-the-art, full-stack job portal that leverages **Sarvam AI** to bridge the gap between candidates and employers. It features a premium, glassmorphism-inspired UI with a dynamic dark/light mode system and specialized AI agents for every step of the recruitment journey.
 
